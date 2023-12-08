@@ -1,0 +1,12 @@
+README.rst
+setup.cfg
+setup.py
+kubeconfig/__init__.py
+kubeconfig/exceptions.py
+kubeconfig/kubeconfig.py
+kubeconfig/kubectl.py
+kubeconfig.egg-info/PKG-INFO
+kubeconfig.egg-info/SOURCES.txt
+kubeconfig.egg-info/dependency_links.txt
+kubeconfig.egg-info/requires.txt
+kubeconfig.egg-info/top_level.txt

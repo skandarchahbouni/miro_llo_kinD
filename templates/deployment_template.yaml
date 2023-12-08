@@ -1,0 +1,56 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{name}}
+  namespace: {{namespace}}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{name}}
+  template:
+    metadata:
+      labels:
+        app: {{name}}
+    spec:
+      containers:
+      - name: {{name}}
+        image: {{image}}
+        {% if expose is defined and expose|length %}
+        ports:
+        {% for exp in expose %}
+        - containerPort: {{exp.containerPort}}
+        {% endfor %}
+        {% endif %}
+        {% if env %}
+        env:
+          {% if env %}
+          {% for vars in env.variables %}
+          - name: {{vars.name}}
+            value: {{vars.value}}
+          {% endfor %}
+          {% endif %}
+          {% if expose %}
+          {% for svc in service_list %}
+          {% if svc.name != name %}
+          - name: {{svc.name}}-FQDN
+            value: "{{svc.name}}.{{namespace}}:{{svc.port}}"
+          {% endif %}
+          {% endfor %}
+          {% endif %}
+        {% endif %}
+      {% if secretName %}
+      imagePullSecrets:
+        - name: {{ secretName }}
+      {% endif %}
+      {% if clusterLabel %}
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: topology.liqo.io/name
+                    operator: In
+                    values:
+                      - {{ clusterLabel }}
+      {% endif %}

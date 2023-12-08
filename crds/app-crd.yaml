@@ -1,0 +1,56 @@
+# ************** Application CRD **************#
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: applications.charity-project.eu
+spec:
+  scope: Namespaced
+  group: charity-project.eu
+  names:
+    kind: Application
+    plural: applications
+    singular: application
+    shortNames:
+      - app
+      - apps
+  versions:
+    - name: v1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              properties:
+                name:
+                  type: string
+                cluster:  
+                  type: string
+                owner:
+                  type: string
+                components:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      name: 
+                        type: string
+                      cluster: 
+                        type: string
+                      
+            # ************************ Status ************************#
+            status:
+              type: object
+              x-kubernetes-preserve-unknown-fields: true
+
+      additionalPrinterColumns:
+        - name: Current status # Rrunning, pending, Failed
+          type: string
+          priority: 0
+          jsonPath: .status.watch_app.current_status
+        - name: Details
+          type: string
+          priority: 0
+          jsonPath: .status.watch_app.details # If status is Running, No details to provide

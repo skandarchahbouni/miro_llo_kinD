@@ -1,0 +1,11 @@
+apiVersion: charity-project.eu/v1
+kind: Application
+metadata:
+  name: my-application
+spec:
+  owner: john.doe
+  name: my-application
+  cluster: kind
+  components:
+    - name: nginx-component
+      cluster: kind
