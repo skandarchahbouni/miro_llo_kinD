@@ -1,20 +1,14 @@
 from jinja2 import Environment, FileSystemLoader
-import tempfile
 from kubernetes import client, config
 from kubernetes.client.rest import ApiException
 import yaml
-from kubeconfig import KubeConfig
-import os
 
+# TODO: check what you have removed from the intall_deployment function (svc_list) .....
 # TODO: handle exceptions 
-# TODO: change this
+# TODO: change this to env variable
 TEMPLATE_DIR = "C:/Users/skand/Downloads/PFE/kopf/application/templates"
 
-# install_deployment(appData["cluster"], component, namespace, "orchestrator-secret", svc_list)
 def install_deployment(component):    
-    # Access the clusterName 
-    # TODO ...
-
     # Get the deployment template 
     environment = Environment(loader=FileSystemLoader(TEMPLATE_DIR))
     deployment_template = environment.get_template("deployment_template.yaml")
@@ -73,7 +67,7 @@ def install_service(component):
     config.load_kube_config()
     api_instance = client.CoreV1Api()
     try:
-        api_response = api_instance.create_namespaced_service(
+        api_instance.create_namespaced_service(
             body=yaml_output,namespace=component["application"], pretty="true"
         )
         print(f"Service created successfully!")
@@ -107,11 +101,6 @@ def uninstall_service(component):
         print(f"Exception when deleting service: {e}")
     
 
-def switch_config(clusterName):
-    # The context in kinD: kind- + (cluster)
-    context = "kind-" + clusterName
-    conf = KubeConfig()
-    conf.use_context(context)
 
 
     

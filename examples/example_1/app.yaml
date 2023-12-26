@@ -5,7 +5,9 @@ metadata:
 spec:
   owner: john.doe
   name: my-application
-  cluster: kind
+  cluster: workload-1
   components:
     - name: nginx-component
-      cluster: kind
+      cluster: workload-2
+    - name: nginx-component-2
+      cluster: workload-1
