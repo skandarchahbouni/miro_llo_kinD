@@ -55,30 +55,21 @@ def create_fn(body, **kwargs):
         return 
     
     try:
-        # switch from the management cluster to the app cluster (PRODUCTION NO!!)
         app_cluster = app_instance['spec']['cluster']
-        print(f"---> switching the context to '{app_cluster}' cluster")
-        switch_config(app_cluster)
-
         # Creating the application
         component = body["spec"]
         component["name"] = component_name
         # install the deployment 
-        install_deployment(component)
+        install_deployment(component=component, app_cluster_context="kind-"+app_cluster)
 
         # Installing services
         if "expose" in component:
             for exp in component["expose"]:
                 if "is-peered" in exp and exp["is-peered"] == True:
-                    install_service(component)
-    except Exception as e:
+                    install_service(component=component, app_cluster_context="kind-"+app_cluster)
+    except Exception as _:
         # TODO: handle exeptions 
         pass
-    finally:
-        # always switch back to the management cluster 
-        management_cluster = os.environ.get('MANAGEMENT_CLUSTER')
-        print("---> switching the context to the management cluster")
-        switch_config(management_cluster)
 
 
                 
@@ -111,29 +102,20 @@ def delete_fn(body, **kwargs):
     # if it doesn't exist, it's impossible (this component shouldn't exist)
     # can update the app status from here ?
 
-    # Switch from the management cluster to the app cluster 
-    print(f"---> switching the context to the '{app_cluster}' cluster")
-    switch_config(app_cluster)
-
     try:
         # Deleting
         component = body["spec"]
         component["name"] = body["metadata"]["name"]
         # uninstall deployment 
-        uninstall_deployment(component)
+        uninstall_deployment(component=component, app_cluster_context="kind-"+app_cluster)
         # uninstall services 
         if "expose" in component:
             for exp in component["expose"]:
                 if "is-peered" in exp and exp["is-peered"] == True:
-                    uninstall_service(component)
+                    uninstall_service(component=component, app_cluster_context="kind-"+app_cluster)
     except:
         # TODO: handle exceptions 
         pass
-    finally:
-        # always switch back to the management cluster 
-        management_cluster = os.environ.get('MANAGEMENT_CLUSTER')
-        print("---> switching the context to the management cluster")
-        switch_config(management_cluster)
 
 
 

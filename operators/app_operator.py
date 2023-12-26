@@ -15,10 +15,8 @@ def create_fn(body, **_):
     app_name = body['spec']['name']
     # Access the app cluster 
     try:
-        print(f"---> switching the context to the {app_cluster} cluster")
-        switch_config(app_cluster)
         # Creating the namespace in this cluster 
-        create_namespace(namespace_name=app_name)
+        create_namespace(namespace_name=app_name, app_cluster_context="kind-"+app_cluster)
         # linking between the app_cluster and the components clusters 
         components_list = body["spec"]["components"]
         # Unique list of components clusters 
@@ -28,14 +26,9 @@ def create_fn(body, **_):
                 # Link the two clusters using liqo, + namespace offloading if this isn't already done 
                 # TODO: ......;
                 pass  
-    except Exception as e:
+    except Exception as _:
         # TODO: handle exceptions 
         pass
-    finally:
-        # always switch back to the management cluster 
-        management_cluster = os.environ.get('MANAGEMENT_CLUSTER')
-        print("---> switching the context to the management cluster")
-        switch_config(management_cluster)
           
 
 
@@ -47,21 +40,14 @@ def delete_fn(body, **_):
     app_name = body["spec"]["name"]
     app_cluster = body["spec"]["cluster"]
     try:
-        print(f"---> switching the context to the {app_cluster} cluster")
-        switch_config(app_cluster)
-        delete_namespace(namespace_name=app_name)
-    except Exception as e:
+        delete_namespace(namespace_name=app_name, app_cluster_context="kind-"+app_cluster)
+    except Exception as _:
         # TODO: handle exceptions
         pass
-    finally:
-        # always switch back to the management cluster 
-        management_cluster = os.environ.get('MANAGEMENT_CLUSTER')
-        print("---> switching the context to the management cluster")
-        switch_config(management_cluster)
     
 
 # **** TO BE IMPLEMENTED ****#
-@kopf.on.field('Application', field='spec.components')
+@kopf.on.update('Application', field='spec.components')
 def handle_update_components_field(old, new, diff, **_):
 
     print('************* OLD *************')
@@ -72,9 +58,4 @@ def handle_update_components_field(old, new, diff, **_):
     print(diff)
     # TODO: check migration  
 
-
-
-
-
-# test
 
