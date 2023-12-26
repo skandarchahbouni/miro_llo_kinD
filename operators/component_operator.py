@@ -1,8 +1,6 @@
 import kopf
 from helpers.component.functions import install_deployment, install_service, uninstall_deployment, uninstall_service
-from helpers.common import switch_config
 from kubernetes import client, config
-import os
 from kubernetes.client.rest import ApiException
 
 

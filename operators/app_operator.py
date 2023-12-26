@@ -1,7 +1,5 @@
 import kopf
-from helpers.common import switch_config
 from helpers.application.functions import create_namespace, delete_namespace
-import os
 
 
 # Global variables 
