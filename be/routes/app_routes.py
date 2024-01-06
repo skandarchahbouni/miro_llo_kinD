@@ -9,9 +9,9 @@ log = logging.getLogger(__name__)
 
 
 @router.get("/clusters/{cluster}/context",  status_code=HTTPStatus.OK)
-async def get_context(cluster: str, request: Request):
+async def get_context(cluster: str):
     log.info(f"/clusters/{cluster}/context GET.")
-    return {"context": "cluster_context"}
+    return app_controller.get_context(cluster=cluster)
 
 @router.get("/applications/{application_name}", status_code=HTTPStatus.OK)
 async def get_app_instance(application_name: str):

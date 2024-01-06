@@ -17,10 +17,6 @@ def get_context(cluster: str) -> requests.Response|None:
     try:
         response = requests.get(url=url)
         return response
-        # if response.status_code == 404:
-        #     logging.info(f"Endpoint returned a 404 status code.")
-        #     return None
-        # return response.json().get("context")
     except requests.exceptions.ConnectionError:
         logging.error("A connection error occurred. [get_context function]")
     except requests.exceptions.Timeout:
@@ -29,6 +25,7 @@ def get_context(cluster: str) -> requests.Response|None:
         logging.error("HTTP Error. [get_context function]")
     except requests.exceptions.RequestException as _:
         logging.error("An error occurred. [get_context function]")
+    return None
 
 def get_app_instance(application_name: str) -> requests.Response | None:
     """
@@ -48,7 +45,7 @@ def get_app_instance(application_name: str) -> requests.Response | None:
         logging.error("HTTP Error. [get_app_instance function]")
     except requests.exceptions.RequestException as _:
         logging.error("An error occurred. [get_app_instance function]")
-
+    return None
 
 # ******************************************************************************* #
 # Functions Needed by the 'application-crd' Operator

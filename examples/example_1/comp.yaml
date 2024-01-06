@@ -9,7 +9,7 @@ spec:
   # replicas: 1
   expose:
     - is-public: false
-      is-peered: false
+      is-peered: true
       is-exposing-metrics: false
       containerPort: 500
       clusterPort: 200

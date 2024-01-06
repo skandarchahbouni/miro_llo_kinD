@@ -24,7 +24,7 @@ def create_app_handler(body, **_):
         # 1- Creating the namespace in the application cluster 
         #  Before creating the namespcae, we have to get the context of the application cluster
         response = app_module.get_context(cluster=app_cluster) # TODO: check whether the get context function should be in the app_module or another location, and implement it
-        if response.status_code != 200:
+        if (response is None) or (response.status_code != 200):
             logging.error(f"Error while retrieving context of {app_cluster} cluster")
             return
         
@@ -48,7 +48,7 @@ def create_app_handler(body, **_):
         
     except Exception as _:
         # TODO: handle exceptions 
-        pass
+        logging.error("Exception in [on.create('Application') handler]")
 
 
 
@@ -81,7 +81,7 @@ def delete_app_handler(body, **_):
         # 3 Deleting the namespace 
         # Before deleting the namespcae, we have to get the context of the application cluster
         response = app_module.get_context(cluster=app_cluster) # TODO: check whether the get context function should be in the app_module or another location, and implement it
-        if response.status_code != 200:
+        if (response is None) or (response.status_code != 200):
             logging.error(f"Error while retrieving context of {app_cluster} cluster")
             return
         app_cluster_context = response.json().get("context")        
@@ -89,7 +89,7 @@ def delete_app_handler(body, **_):
    
     except Exception as _:
         # TODO: handle exceptions
-        pass
+        logging.error("Exception in [on.delete('Application') handler]")
 
 
 # Application name is immutable, so the only update that can happen to the Application crd is in the components list. 
@@ -149,7 +149,10 @@ def create_comp_handler(body, **_):
     # 1 - Get the application cluster from the application instance 
     try:
         response = app_module.get_app_instance(application_name=application) # TODO: implement this function
-        if (response.status_code == 404):
+        if (response is None):
+            logging.error("Something went wrong!")
+            return 
+        elif (response.status_code == 404):
             logging.error("App instance doesn't exist. you have always to create the application before creating it's components.")
             return
         elif (response.status_code != 200):
@@ -157,7 +160,8 @@ def create_comp_handler(body, **_):
             return 
         app_instance = response.json()
     except Exception as _:
-        pass
+        logging.error("Exception in [on.create('Component') handler]")
+        return 
 
     app_cluster = app_instance["spec"]["cluster"]
 
@@ -177,7 +181,7 @@ def create_comp_handler(body, **_):
     try:
         # Getting the app_cluster context
         resp = app_module.get_context(cluster=app_cluster) # TODO: check whether the get context function should be in the app_module or another location, and implement it
-        if resp.status_code != 200:
+        if (resp is None) or (resp.status_code != 200):
             logging.error(f"Error while retrieving context of {app_cluster} cluster")
             return
         
@@ -202,7 +206,7 @@ def create_comp_handler(body, **_):
 
         # TODO : Check anything else to do ..... 
     except Exception as _:
-        pass
+        logging.error("Exception in [on.create('Component') handler]")
 
 
 
@@ -221,12 +225,13 @@ def delete_comp_handler(body, **_):
     # 1 - Get the application cluster from the application instance, as well as the component cluster 
     try:
         response = app_module.get_app_instance(application_name=application) # TODO: implement this function
-        if response.status_code != 200:
+        if (response is None) or (response.status_code != 200):
             logging.error("Something went wrong!")
             return 
         app_instance = response.json()
     except Exception as _:
         # TODO: handle exceptions
+        logging.error("Exception in [on.delete('Component') handler]")
         return 
     app_cluster = app_instance['spec']['cluster']
 
@@ -241,7 +246,7 @@ def delete_comp_handler(body, **_):
     try:
         # Getting the app_cluster context
         resp = app_module.get_context(cluster=app_cluster) # TODO: check whether the get context function should be in the app_module or another location, and implement it
-        if resp.status_code != 200:
+        if (resp is None) or (resp.status_code != 200):
             logging.error(f"Error while retrieving context of {app_cluster} cluster")
             return
         
@@ -272,7 +277,7 @@ def delete_comp_handler(body, **_):
                     
     except Exception as _:
         # TODO: handle exeptions 
-        pass
+        logging.error("Exception in [on.delete('Component') handler]")
 
 
 # Please note that this function doesn't handle the update of "expose", "tls" fields. 
@@ -295,12 +300,13 @@ def update_comp_handler_deployment(body, **_):
     # 1 - Get the application cluster from the application instance 
     try:
         response = app_module.get_app_instance(application_name=application) # TODO: implement this function
-        if (response.status_code != 200):
+        if (response is None) or (response.status_code != 200):
             logging.error("Something went wrong!")
             return 
         app_instance = response.json()
     except Exception as _:
         # TODO: handle exceptions
+        logging.error("Exception in [on.update('Component') handler: [update_comp_handler_deployment] function.]")
         return 
     app_cluster = app_instance['spec']['cluster']
 
@@ -314,7 +320,7 @@ def update_comp_handler_deployment(body, **_):
     try:
         # Getting the app_cluster context
         resp = app_module.get_context(cluster=app_cluster) # TODO: check whether the get context function should be in the app_module or another location, and implement it
-        if resp.status_code != 200:
+        if (resp is None) or (resp.status_code != 200):
             logging.error(f"Error while retrieving context of {app_cluster} cluster")
             return
         
@@ -322,7 +328,8 @@ def update_comp_handler_deployment(body, **_):
         # Re-apply the deployment (we can rename the "install_deployment" function to "apply_deployment")
         app_module.install_deployment(component=component, app_cluster_context=app_cluster_context) 
     except Exception as _:
-        pass
+        logging.error("Exception in [on.update('Component') handler: [update_comp_handler_deployment] function.]")
+
 
 
 # Handler for the expose field 
@@ -338,57 +345,60 @@ def update_comp_handler_expose_field(body, old, new, **_):
     # Get the application cluster from the application instance 
     try:
         response = app_module.get_app_instance(application_name=body["spec"]["application"]) # TODO: implement this function
-        if response.status_code != 200:
+        if (response is None) or (response.status_code != 200):
             logging.error("Something went wrong!")
             return 
         
         app_instance = response.json()
     except Exception as _:
         # TODO: handle exceptions
+        logging.error("Exception in [on.update('Component') handler: [update_comp_handler_expose_field] function.]")
         return 
     app_cluster = app_instance['spec']['cluster']
 
     # Retrieving the app_cluster context
     resp = app_module.get_context(cluster=app_cluster) # TODO: check whether the get context function should be in the app_module or another location, and implement it
-    if resp.status_code != 200:
+    if (resp is None) or (resp.status_code != 200):
         logging.error(f"Error while retrieving context of {app_cluster} cluster")
         return
     
     app_cluster_context = resp.json().get("context")
 
-
-    # ------------- UPDATE SERVICE -------------#
-    # filter only the ports where "is-peered" is set to True (is-peered=True)
-    peered_ports = [port for port in new if port["is-peered"]==True]
-    if len(peered_ports):
-        # Re-aplly the service, 
-        app_module.install_service(component_name=body["spec"]["name"], ports_list=peered_ports, app_cluster_context=app_cluster_context) # TODO: Customize this function
-    else:
-        # len(peered_ports) = 0 => no port is peered => DELETE the service if it was existing before.
-        # Check whether the service was created before  
-        old_peered_ports = [port for port in old if port["is-peered"]==True]
-        if len(old_peered_ports):
-            # Delete the service 
-                app_module.uninstall_service(component_name=body["spec"]["name"], app_name=body["spec"]["application"], app_cluster_context=app_cluster_context) # TODO: Customize this function
-
-
-
-    # ------------- UPDATE SERVICEMONITOR -------------#
-    # Exactly the same logic as above with "Service"
-    exposing_metrics_ports = [port for port in new if port["is-exposing-metrics"]==True]
-    if len(exposing_metrics_ports):
-        # Re-aplly the service, 
-        app_module.install_servicemonitor(component_name=body["spec"]["name"], ports_list=exposing_metrics_ports, app_cluster_context=app_cluster_context) # TODO: Customize this function
-    
-    else: 
-        old_exposing_metrics_ports = [port for port in old if port["is-exposing-metrics"]==True]
-        if len(old_exposing_metrics_ports):
-            # Delete the service 
-                app_module.uninstall_servicemonitor(component_name=body["spec"]["name"], app_name=body["spec"]["application"], app_cluster_context=app_cluster_context) # TODO: Customize this function
+    try:
+        # ------------- UPDATE SERVICE -------------#
+        # filter only the ports where "is-peered" is set to True (is-peered=True)
+        peered_ports = [port for port in new if port["is-peered"]==True]
+        if len(peered_ports):
+            # Re-aplly the service, 
+            app_module.install_service(component_name=body["spec"]["name"], ports_list=peered_ports, app_cluster_context=app_cluster_context) # TODO: Customize this function
+        else:
+            # len(peered_ports) = 0 => no port is peered => DELETE the service if it was existing before.
+            # Check whether the service was created before  
+            old_peered_ports = [port for port in old if port["is-peered"]==True]
+            if len(old_peered_ports):
+                # Delete the service 
+                    app_module.uninstall_service(component_name=body["spec"]["name"], app_name=body["spec"]["application"], app_cluster_context=app_cluster_context) # TODO: Customize this function
 
 
-    # ------------- UPDATE INGRESS -------------#
-    #  TODO : ........
+
+        # ------------- UPDATE SERVICEMONITOR -------------#
+        # Exactly the same logic as above with "Service"
+        exposing_metrics_ports = [port for port in new if port["is-exposing-metrics"]==True]
+        if len(exposing_metrics_ports):
+            # Re-aplly the service, 
+            app_module.install_servicemonitor(component_name=body["spec"]["name"], ports_list=exposing_metrics_ports, app_cluster_context=app_cluster_context) # TODO: Customize this function
+        
+        else: 
+            old_exposing_metrics_ports = [port for port in old if port["is-exposing-metrics"]==True]
+            if len(old_exposing_metrics_ports):
+                # Delete the service 
+                    app_module.uninstall_servicemonitor(component_name=body["spec"]["name"], app_name=body["spec"]["application"], app_cluster_context=app_cluster_context) # TODO: Customize this function
+
+
+        # ------------- UPDATE INGRESS -------------#
+        #  TODO : ........          
+    except Exception as _:
+        logging.error("Exception in [on.update('Component') handler: [update_comp_handler_expose_field] function.]")
 
 
 
