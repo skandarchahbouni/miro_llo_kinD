@@ -46,14 +46,32 @@ def delete_fn(body, **_):
 
 # **** TO BE IMPLEMENTED ****#
 @kopf.on.update('Application', field='spec.components')
-def handle_update_components_field(old, new, diff, **_):
+def handle_update_components_field(body, old, new, **_):
 
-    print('************* OLD *************')
-    print(old)
-    print('************* New *************')
-    print(new)
-    print('************* Diff *************')
-    print(diff)
-    # TODO: check migration  
+    # All the components were added
+    if (old is None):
+        print(new, [], [])
+        return
+  
+    # All the components were removed   
+    if (new is None):
+        print([], old, [])
+        return
+
+    added_components = [obj for obj in new if obj not in old]
+    removed_components = [obj for obj in old if obj not in new]
+    
+    old_dict = {obj['name']: obj['cluster'] for obj in old}
+    new_dict = {obj['name']: obj['cluster'] for obj in new}
+    
+    migrated_components = [
+        {'name': name, 'old_cluster': old_dict[name], 'new_cluster': new_dict[name]}
+        for name in set(old_dict) & set(new_dict)
+        if old_dict[name] != new_dict[name]
+    ]
+
+    print(f"added_components : {added_components}")
+    print(f"removed_components : {removed_components}")
+    print(f"migrated_components : {migrated_components}")
 
 

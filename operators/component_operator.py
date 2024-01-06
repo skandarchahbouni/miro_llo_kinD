@@ -1,5 +1,5 @@
 import kopf
-from helpers.component.functions import install_deployment, install_service, uninstall_deployment, uninstall_service
+from helpers.component.functions import install_deployment, install_service, uninstall_deployment, uninstall_service, install_service_monitor
 from kubernetes import client, config
 from kubernetes.client.rest import ApiException
 
@@ -11,7 +11,7 @@ version = "v1"
 plural = "applications"  
 
 @kopf.on.create('Component')
-def create_fn(body, **kwargs):
+def create_fn(body, **_):
     # Get the application instance 
     config.load_kube_config()
     custom_objects_api = client.CustomObjectsApi()
@@ -62,9 +62,13 @@ def create_fn(body, **kwargs):
 
         # Installing services
         if "expose" in component:
-            for exp in component["expose"]:
+            # TODO: review this !!!!!!!! if len(exp)==2, install service should not be inside the for loop !!! 
+            # logique 3yana bzaf hnaaa 
+            for exp in component["expose"]: 
                 if "is-peered" in exp and exp["is-peered"] == True:
                     install_service(component=component, app_cluster_context="kind-"+app_cluster)
+                if "is-exposing-metrics" in exp and exp["is-exposing-metrics"] == True:
+                    install_service_monitor(namespace=component['application'] ,component_name=component["name"], cluster_port=exp["clusterPort"], app_cluster_context="kind-"+app_cluster)
     except Exception as _:
         # TODO: handle exeptions 
         pass
@@ -72,10 +76,8 @@ def create_fn(body, **kwargs):
 
                 
 
-
-
 @kopf.on.delete('Component')
-def delete_fn(body, **kwargs):
+def delete_fn(body, **_):
     # Get the application instance 
     config.load_kube_config()
     custom_objects_api = client.CustomObjectsApi()
@@ -114,6 +116,9 @@ def delete_fn(body, **kwargs):
     except:
         # TODO: handle exceptions 
         pass
+
+
+
 
 
 

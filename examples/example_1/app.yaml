@@ -8,6 +8,7 @@ spec:
   cluster: workload-1
   components:
     - name: nginx-component
-      cluster: workload-2
-    - name: nginx-component-2
       cluster: workload-1
+    # - name: another-component
+    #   cluster: workload-2
+    # ..........

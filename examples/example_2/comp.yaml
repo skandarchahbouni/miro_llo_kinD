@@ -1,0 +1,15 @@
+apiVersion: charity-project.eu/v1
+kind: Component
+metadata:
+  name: comp-1
+spec:
+  application: example-app
+  image: aimvector/python:metrics
+  name: nginx-component
+  # replicas: 1
+  expose:
+    - is-public: false
+      is-peered: true
+      is-exposing-metrics: true
+      containerPort: 5000
+      clusterPort: 80 

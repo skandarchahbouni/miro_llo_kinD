@@ -10,6 +10,7 @@ spec:
   ports:
   {% for exp in expose %}
   - protocol: TCP
+    name: {{ name ~ "-" ~ exp.clusterPort }}
     port: {{ exp.clusterPort }}
     targetPort: {{ exp.containerPort }}
   {% endfor %}

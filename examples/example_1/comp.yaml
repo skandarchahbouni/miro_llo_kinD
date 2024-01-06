@@ -5,10 +5,16 @@ metadata:
 spec:
   application: my-application
   image: nginx:latest
+  name: nginx-component
   # replicas: 1
   expose:
     - is-public: false
-      is-peered: true
+      is-peered: false
       is-exposing-metrics: false
-      containerPort: 80
-      clusterPort: 80
+      containerPort: 500
+      clusterPort: 200
+    # - is-public: false
+    #   is-peered: true
+    #   is-exposing-metrics: false
+    #   containerPort: 100
+    #   clusterPort: 8080

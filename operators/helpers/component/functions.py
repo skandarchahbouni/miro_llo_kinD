@@ -99,10 +99,36 @@ def uninstall_service(component: dict, app_cluster_context: str):
         print("Service uninstalled successfully!")
     except ApiException as _:
         print(f"Exception when deleting service")
+
+
+def install_service_monitor(namespace: str, component_name: str, cluster_port: int, app_cluster_context: str):
+      # Get the ServiceMonitor template 
+    environment = Environment(loader=FileSystemLoader(TEMPLATE_DIR))
+    service_monitor_template = environment.get_template("ServiceMonitor_template.yaml")
+    try:
+        rendered_service_monitor = service_monitor_template.render(     
+                                                        namespace=namespace,
+                                                        component_name=component_name, 
+                                                        cluster_port=cluster_port
+                                                )
     
+        yaml_output = yaml.safe_load(rendered_service_monitor)
 
+        # Apply the CRD using the Kubernetes Python client library
+        config.load_kube_config(context=app_cluster_context)
+        api_instance = client.CustomObjectsApi()
 
+        # creating the ServiceMonitor 
+        api_version = yaml_output['apiVersion']
 
-    
-
-
+        # Apply the CRD
+        api_instance.create_namespaced_custom_object(
+            group=api_version.split('/')[0],
+            version=api_version.split('/')[1],
+            namespace=namespace,
+            plural="servicemonitors",  # Assuming plural form, adjust if needed
+            body=yaml_output,
+        )
+        print("ServiceMonitor Object created successfully!")
+    except Exception as _:
+        print(f"Exception install_service_monitor function.")

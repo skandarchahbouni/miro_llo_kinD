@@ -23,8 +23,8 @@ spec:
             spec:
               type: object
               properties:
-                # name:
-                #   type: string
+                name:
+                  type: string
                 application:
                   type: string
                 image:

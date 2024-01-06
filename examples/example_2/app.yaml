@@ -1,0 +1,11 @@
+apiVersion: charity-project.eu/v1
+kind: Application
+metadata:
+  name: example-app
+spec:
+  owner: john.doe
+  name: example-app
+  cluster: workload-2
+  components:
+    - name: comp-1
+      cluster: workload-2

@@ -7,8 +7,8 @@ def create_namespace(namespace_name: str, app_cluster_context: str):
         new_namespace = client.V1Namespace(metadata=client.V1ObjectMeta(name=namespace_name))
         api_response = api_instance.create_namespace(body=new_namespace)
         print(f"Namespace {api_response.metadata.name} created successfully!.")
-    except Exception as _:
-        print("Error creating namespace")
+    except Exception as e:
+        print("Error creating namespace  {e}")
 
 def delete_namespace(namespace_name: str, app_cluster_context: str):
     try:
