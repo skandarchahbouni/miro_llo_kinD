@@ -9,12 +9,7 @@ spec:
   # replicas: 1
   expose:
     - is-public: false
-      is-peered: true
+      is-peered: false
       is-exposing-metrics: false
-      containerPort: 500
-      clusterPort: 200
-    # - is-public: false
-    #   is-peered: true
-    #   is-exposing-metrics: false
-    #   containerPort: 100
-    #   clusterPort: 8080
+      containerPort: 80
+      clusterPort: 80

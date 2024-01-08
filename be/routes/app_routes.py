@@ -1,68 +1,115 @@
 import logging
-from fastapi import APIRouter, Request
-from http import HTTPStatus
+from fastapi import APIRouter, Request, Body, status
 from controllers import app_controller
 
 router = APIRouter()
 log = logging.getLogger(__name__)
 
 
-
-@router.get("/clusters/{cluster}/context",  status_code=HTTPStatus.OK)
-async def get_context(cluster: str):
-    log.info(f"/clusters/{cluster}/context GET.")
+@router.get("/clusters/{cluster}/context", status_code=status.HTTP_200_OK)
+def get_context(cluster: str):
+    logging.info(f"/clusters/{cluster}/context GET.")
     return app_controller.get_context(cluster=cluster)
 
-@router.get("/applications/{application_name}", status_code=HTTPStatus.OK)
-async def get_app_instance(application_name: str):
-    log.info(f"/applications/{application_name} GET")
+
+@router.get("/applications/{application_name}", status_code=status.HTTP_200_OK)
+def get_app_instance(application_name: str):
+    logging.info(f"/applications/{application_name} GET")
     return app_controller.get_app_instance(application_name=application_name)
 
-@router.post("/namespaces", status_code=HTTPStatus.CREATED)
-async def create_namespace(request: Request):
-    log.info("/namespaces POST")
-    # Placeholder for the logic related to the create_namespace function (POST)
-    return {"message": "create_namespace endpoint (POST)"}
 
-@router.delete("/namespaces/{namespace_name}", status_code=HTTPStatus.NO_CONTENT)
-async def delete_namespace(namespace_name: str, request: Request):
-    log.info(f"/namespaces/{namespace_name} DELETE")
-    # Placeholder for the logic related to the delete_namespace function (DELETE)
+@router.post("/namespaces", status_code=status.HTTP_201_CREATED)
+def create_namespace(
+    namespace_name: str = Body(...),
+    app_cluster_context: str = Body(
+        ...,
+    ),
+):
+    logging.info("/namespaces POST")
+    return app_controller.create_namespace(
+        namespace_name=namespace_name, app_cluster_context=app_cluster_context
+    )
 
-@router.delete("/applications/{app_name}/components/{component_name}", status_code=HTTPStatus.NO_CONTENT)
-async def delete_component(app_name: str, component_name: str, request: Request):
-    log.info(f"/applications/{app_name}/components/{component_name} DELETE")
+
+@router.delete("/namespaces/{namespace_name}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_namespace(
+    namespace_name: str, app_cluster_context: str = Body(..., embed=True)
+):
+    logging.info(f"/namespaces/{namespace_name} DELETE")
+    return app_controller.delete_namespace(
+        namespace_name=namespace_name, app_cluster_context=app_cluster_context
+    )
+
+
+@router.delete(
+    "/applications/{app_name}/components/{component_name}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def delete_component(app_name: str, component_name: str, request: Request):
+    logging.info(f"/applications/{app_name}/components/{component_name} DELETE")
     # Placeholder for the logic related to the delete_component function (DELETE)
 
-@router.post("/deployments", status_code=HTTPStatus.CREATED)
+
+@router.post("/deployments", status_code=status.HTTP_201_CREATED)
 async def install_deployment(request: Request):
-    log.info("/deployments POST")
-    # Placeholder for the logic related to the install_deployment function (POST)
-    return {"message": "install_deployment endpoint (POST)"}
+    logging.info("/deployments POST")
+    # Change that, add examples and remove async
+    body = await request.json()
+    return app_controller.install_deployment(
+        component=body["component"], app_cluster_context=body["app_cluster_context"]
+    )
 
-@router.post("/services", status_code=HTTPStatus.CREATED)
-async def install_service(request: Request):
-    log.info("/services POST")
-    # Placeholder for the logic related to the install_service function (POST)
-    return {"message": "install_service endpoint (POST)"}
 
-@router.post("/servicemonitors", status_code=HTTPStatus.CREATED)
-async def install_servicemonitor(request: Request):
-    log.info("/servicemonitors POST")
+@router.post("/services", status_code=status.HTTP_201_CREATED)
+def install_service(
+    component_name: str = Body(...),
+    app_name: str = Body(...),
+    ports_list: list = Body(...),
+    app_cluster_context: str = Body(...),
+):
+    logging.info("/services POST")
+    return app_controller.install_service(
+        component_name=component_name,
+        app_name=app_name,
+        ports_list=ports_list,
+        app_cluster_context=app_cluster_context,
+    )
+
+
+@router.post("/servicemonitors", status_code=status.HTTP_201_CREATED)
+def install_servicemonitor(request: Request):
+    logging.info("/servicemonitors POST")
     # Placeholder for the logic related to the install_servicemonitor function (POST)
     return {"message": "install_servicemonitor endpoint (POST)"}
 
-@router.delete("/deployments/{component_name}", status_code=HTTPStatus.NO_CONTENT)
-async def uninstall_deployment(component_name: str, request: Request):
-    log.info(f"/deployments/{component_name} DELETE")
-    # Placeholder for the logic related to the uninstall_deployment function (DELETE)
 
-@router.delete("/services/{component_name}", status_code=HTTPStatus.NO_CONTENT)
-async def uninstall_service(component_name: str, request: Request):
-    log.info(f"/services/{component_name} DELETE")
-    # Placeholder for the logic related to the uninstall_service function (DELETE)
+@router.delete("/deployments/{component_name}", status_code=status.HTTP_204_NO_CONTENT)
+def uninstall_deployment(
+    component_name: str, app_cluster_context: str = Body(...), app_name: str = Body()
+):
+    logging.info(f"/deployments/{component_name} DELETE")
+    return app_controller.uninstall_deployment(
+        component_name=component_name,
+        app_cluster_context=app_cluster_context,
+        app_name=app_name,
+    )
 
-@router.delete("/servicemonitors/{component_name}", status_code=HTTPStatus.NO_CONTENT)
-async def uninstall_servicemonitor(component_name: str, request: Request):
-    log.info(f"/servicemonitors/{component_name} DELETE")
+
+@router.delete("/services/{component_name}", status_code=status.HTTP_204_NO_CONTENT)
+def uninstall_service(
+    component_name: str, app_name: str = Body(...), app_cluster_context: str = Body(...)
+):
+    logging.info(f"/services/{component_name} DELETE")
+    return app_controller.uninstall_service(
+        component_name=component_name,
+        app_name=app_name,
+        app_cluster_context=app_cluster_context,
+    )
+
+
+@router.delete(
+    "/servicemonitors/{component_name}", status_code=status.HTTP_204_NO_CONTENT
+)
+def uninstall_servicemonitor(component_name: str, request: Request):
+    logging.info(f"/servicemonitors/{component_name} DELETE")
     # Placeholder for the logic related to the uninstall_servicemonitor function (DELETE)
