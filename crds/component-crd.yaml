@@ -22,19 +22,35 @@ spec:
           properties:
             spec:
               type: object
+              required:
+                - name
+                - application
+                - image
               properties:
                 name:
                   type: string
+                  maxLength: 63
+                  # pattern:
                 application:
                   type: string
+                  maxLength: 63
                 image:
                   type: string
+                  # TODO: add regex
                 replicas:
                   type: integer
+                  minimum: 1
+                  default: 1
                 expose:
                   type: array
                   items:
                     type: object
+                    required:
+                      - is-public
+                      - is-exposing-metrics
+                      - is-peered
+                      - containerPort
+                      - clusterPort
                     properties:
                       is-public:
                         type: boolean
@@ -44,8 +60,12 @@ spec:
                         type: boolean
                       containerPort:
                         type: integer
+                        minimum: 0
+                        maximum: 65535
                       clusterPort:
                         type: integer
+                        minimum: 0
+                        maximum: 65535
                 env:
                   type: object
                   properties:

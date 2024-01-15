@@ -13,6 +13,10 @@ version = "v1"
 plural = "applications"
 
 
+# ADD YOUR PATH HERE
+TEMPLATE_DIR = "/mnt/c/Users/skand/Downloads/PFE/miro_llo_kinD/miro_llo_kinD/templates"
+
+
 # Functions
 def get_context(cluster: str):
     # In kind we have just to add the "kind-" to the cluster name to get the context
@@ -73,14 +77,11 @@ def delete_namespace(namespace_name: str, app_cluster_context: str):
         raise HTTPException(status_code=e.status)
 
 
-TEMPLATE_DIR = "C:/Users/skand/Downloads/PFE/kopf/application/templates"
-
-
 def install_deployment(component: dict, app_cluster_context: str):
     # Get the deployment template
-    environment = Environment(loader=FileSystemLoader(TEMPLATE_DIR))
-    deployment_template = environment.get_template("deployment_template.yaml")
     try:
+        environment = Environment(loader=FileSystemLoader(TEMPLATE_DIR))
+        deployment_template = environment.get_template("deployment_template.yaml")
         # Configure fields
         rendered_deployment = deployment_template.render(
             name=component["name"],
@@ -137,10 +138,10 @@ def uninstall_deployment(component_name: str, app_name: str, app_cluster_context
 def install_service(
     component_name: str, app_name: str, ports_list: list, app_cluster_context: str
 ):
-    # Get template
-    environment = Environment(loader=FileSystemLoader(TEMPLATE_DIR))
-    service_template = environment.get_template("service_template.yaml")
     try:
+        # Get template
+        environment = Environment(loader=FileSystemLoader(TEMPLATE_DIR))
+        service_template = environment.get_template("service_template.yaml")
         rendered_service = service_template.render(
             name=component_name,
             expose=ports_list,
@@ -183,3 +184,249 @@ def uninstall_service(component_name: str, app_name: str, app_cluster_context: s
     except ApiException as e:
         logging.error("Error: app_controller.uninstall_service")
         raise HTTPException(status_code=e.status)
+
+
+# Still other apps to be implemented
+def install_servicemonitor(
+    app_name: str, component_name: str, ports_list: list, app_cluster_context: str
+):
+    # Get the ServiceMonitor template
+    try:
+        environment = Environment(loader=FileSystemLoader(TEMPLATE_DIR))
+        ingress_template = environment.get_template("ServiceMonitor_template.yaml")
+        rendered_service_monitor = service_monitor_template.render(
+            namespace=app_name,
+            component_name=component_name,
+            expose=ports_list,
+        )
+
+        yaml_output = yaml.safe_load(rendered_service_monitor)
+    except Exception as _:
+        logging.error(
+            "Error: <<app_controller.install_servicemonitor>> when generating the yaml file"
+        )
+        raise HTTPException(status_code=500)
+
+    try:
+        # Apply the CRD using the Kubernetes Python client library
+        config.load_kube_config(context=app_cluster_context)
+        api_instance = client.CustomObjectsApi()
+
+        # creating the ServiceMonitor
+        api_version = yaml_output["apiVersion"]
+
+        # Apply the CRD
+        api_instance.create_namespaced_custom_object(
+            group=api_version.split("/")[0],
+            version=api_version.split("/")[1],
+            namespace=app_name,
+            plural="servicemonitors",
+            body=yaml_output,
+        )
+        logging.info(f"ServiceMonitor created successfully!")
+    except ConfigException as _:
+        logging.error("Error: load_kube_config [app_controller.install_servicemonitor]")
+        raise HTTPException(status_code=500)
+    except ApiException as e:
+        logging.error("Error: app_controller.install_servicemonitor")
+        raise HTTPException(status_code=e.status)
+
+
+def uninstall_servicemonitor(
+    component_name: str, app_name: str, app_cluster_context: str
+):
+    try:
+        config.load_kube_config(context=app_cluster_context)
+        api_instance = client.CustomObjectsApi()
+        api_instance.delete_namespaced_custom_object(
+            group="monitoring.coreos.com",
+            version="v1",
+            namespace=app_name,
+            name=component_name,
+            plural="servicemonitors",
+            body=client.V1DeleteOptions(),
+        )
+    except ConfigException as _:
+        logging.error("Error: load_kube_config [app_controller.install_servicemonitor]")
+        raise HTTPException(status_code=500)
+    except ApiException as e:
+        logging.error("Error: app_controller.install_servicemonitor")
+        raise HTTPException(status_code=e.status)
+
+
+def delete_component(component_name: str, app_name: str):
+    try:
+        # default context : Management cluster
+        config.load_kube_config()
+        api_instance = client.CustomObjectsApi()
+        api_instance.delete_namespaced_custom_object(
+            group="charity-project.eu",
+            version="v1",
+            namespace="default",  # change to app_name or change in the metadata
+            name=component_name,
+            plural="components",
+            body=client.V1DeleteOptions(),
+        )
+    except ConfigException as _:
+        logging.error("Error: load_kube_config [app_controller.delete_component]")
+        raise HTTPException(status_code=500)
+    except ApiException as e:
+        logging.error("Error: app_controller.delete_component")
+        raise HTTPException(status_code=e.status)
+
+
+def add_host_to_ingress(
+    app_name: str, component_name: str, app_cluster_context: str, port: int
+):
+    ingress_exist = True
+    # Getting the ingress of the application if it exists
+    try:
+        hosts = _get_existing_hosts(
+            app_cluster_context=app_cluster_context, app_name=app_name
+        )
+        hosts.append({"component_name": component_name, "port": port})
+    except ApiException as e:
+        if e.status == 404:
+            ingress_exist = False
+            hosts = [{"component_name": component_name, "port": port}]
+        else:
+            raise HTTPException(status_code=e.status)
+
+    try:
+        environment = Environment(loader=FileSystemLoader(TEMPLATE_DIR))
+        ingress_template = environment.get_template("ingress_template.yaml")
+        rendered_ingress = ingress_template.render(
+            app_name=app_name,
+            component_name=component_name,
+            hosts=hosts,
+        )
+
+        yaml_output = yaml.safe_load(rendered_ingress)
+    except Exception as _:
+        logging.error(
+            "Error: <<app_controller.add_host_to_ingress>> when generating the yaml file"
+        )
+        raise HTTPException(status_code=500)
+
+    try:
+        api_instance = client.NetworkingV1Api()
+        if ingress_exist == False:
+            api_instance.create_namespaced_ingress(namespace=app_name, body=yaml_output)
+            logging.info(f"ingress created successfully!")
+        else:
+            api_instance.replace_namespaced_ingress(
+                name=f"{app_name}-ingress", namespace=app_name, body=yaml_output
+            )
+            logging.info(f"ingress updated successfully!")
+    except ConfigException as _:
+        logging.error("Error: load_kube_config [app_controller.add_host_to_ingress]")
+        raise HTTPException(status_code=500)
+    except ApiException as e:
+        logging.error("Error: app_controller.add_host_to_ingress")
+        raise HTTPException(status_code=e.status)
+
+
+def remove_host_from_ingress(
+    app_cluster_context: str, component_name: str, app_name: str
+):
+    try:
+        hosts = _get_existing_hosts(
+            app_cluster_context=app_cluster_context, app_name=app_name
+        )
+        hosts_list = [
+            host for host in hosts if host["component_name"] != component_name
+        ]
+
+        # Updating or Deleting the ingress
+        config.load_kube_config(context=app_cluster_context)
+        api_instance = client.NetworkingV1Api()
+        if len(hosts_list) == 0:
+            # Remove the ingress
+            api_instance.delete_namespaced_ingress(
+                name=f"{app_name}-ingress", namespace=app_name
+            )
+            logging.info("ingress deleted successfully")
+        else:
+            environment = Environment(loader=FileSystemLoader(TEMPLATE_DIR))
+            ingress_template = environment.get_template("ingress_template.yaml")
+            rendered_ingress = ingress_template.render(
+                app_name=app_name,
+                component_name=component_name,
+                hosts=hosts_list,
+            )
+            yaml_output = yaml.safe_load(rendered_ingress)
+            api_instance.replace_namespaced_ingress(
+                name=f"{app_name}-ingress", namespace=app_name, body=yaml_output
+            )
+    except ConfigException as _:
+        logging.error(
+            "Error: load_kube_config [app_controller.remove_host_from_ingress]"
+        )
+        raise HTTPException(status_code=500)
+    except ApiException as e:
+        raise HTTPException(status_code=e.status)
+    except Exception as _:
+        raise HTTPException(status_code=500)
+
+
+def update_host_in_ingress(
+    app_cluster_context: str, component_name: str, app_name: str, new_port: int
+):
+    try:
+        hosts = _get_existing_hosts(
+            app_cluster_context=app_cluster_context, app_name=app_name
+        )
+
+        for host in hosts:
+            if host["component_name"] == component_name:
+                host["port"] = new_port
+                break
+
+        # Updating or Deleting the ingress
+        environment = Environment(loader=FileSystemLoader(TEMPLATE_DIR))
+        ingress_template = environment.get_template("ingress_template.yaml")
+        rendered_ingress = ingress_template.render(
+            app_name=app_name,
+            component_name=component_name,
+            hosts=hosts,
+        )
+        yaml_output = yaml.safe_load(rendered_ingress)
+        # Updating the ingress
+        config.load_kube_config(context=app_cluster_context)
+        api_instance = client.NetworkingV1Api()
+        api_instance.replace_namespaced_ingress(
+            name=f"{app_name}-ingress", namespace=app_name, body=yaml_output
+        )
+    except ConfigException as _:
+        logging.error("Error: load_kube_config [app_controller.update_host_in_ingress]")
+        raise HTTPException(status_code=500)
+    except ApiException as e:
+        raise HTTPException(status_code=e.status)
+    except Exception as _:
+        raise HTTPException(status_code=500)
+
+
+def _get_existing_hosts(app_cluster_context: str, app_name: str):
+    try:
+        # TODO
+        config.load_kube_config(context=app_cluster_context)
+        api_instance = client.NetworkingV1Api()
+        ingress = api_instance.read_namespaced_ingress(
+            name=f"{app_name}-ingress", namespace=app_name
+        )
+        hosts = []
+        for host in ingress.spec.rules:
+            hosts.append(
+                {
+                    "component_name": host.http.paths[0].backend.service.name,
+                    "port": host.http.paths[0].backend.service.port.number,
+                }
+            )
+        return hosts
+    except ConfigException as _:
+        logging.error(
+            "Error: load_kube_config [app_controller.add_host_to_ingress (_get_ingress)]"
+        )
+        raise HTTPException(status_code=500)
+    except ApiException as e:
+        raise e

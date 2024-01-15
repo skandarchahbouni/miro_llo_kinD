@@ -1,7 +1,207 @@
 import kopf
 import logging
-import config
+import kubernetes
 from fastapi import status
+import config
+import re
+
+
+# ---------------------------------- ADMISSION WEBHOOKS ---------------------------------- #
+@kopf.on.startup()
+def setup(settings: kopf.OperatorSettings, **_):
+    settings.admission.managed = "auto.kopf.dev"
+    settings.admission.server = kopf.WebhookAutoTunnel()
+
+
+# ---------------------------------- Application-validation ---------------------------------- #
+# def _validate_app_fields(spec):
+#     # Regex for the application name
+#     # application name will be used as a DNS label, see ingress template to understand
+#     # Regex source: https://stackoverflow.com/questions/2063213/regular-expression-for-validating-dns-label-host-name
+#     regex = re.compile("^(?![0-9]+$)(?!-)[a-zA-Z0-9-]{,63}(?<!-)$")
+#     is_match = regex.match(spec.get("name")) is not None
+#     if not is_match:
+#         raise kopf.AdmissionError("application name must be a valid DNS label name.")
+
+#     # Similarly application name must also be valid DNS label.
+#     for component in spec.get("components"):
+#         is_match = regex.match(component.get("name")) is not None
+#         if not is_match:
+#             raise kopf.AdmissionError("component name must be a valid DNS label name.")
+
+#     # TODO: check clusters regex, and check that cluster exist and are ready
+
+#     # Forbidden names : There are some pre-created namespaces when creating a new cluster, for example "default" and "kube-system"..
+#     # So the application name must not be one of those names.
+#     # TODO: use an api call to get this list instead of hardcoding it.
+#     forbidden_names = [
+#         "local-path-storage",
+#         "kube-system",
+#         "kube-public",
+#         "kube-node-lease",
+#         "ingress-nginx",
+#         "monitoring",
+#         "default",
+#     ]
+
+#     if spec.get("name") in forbidden_names:
+#         raise kopf.AdmissionError(
+#             "application name forbidden, please choose another name for your application."
+#         )
+
+#     contexts, _ = kubernetes.config.list_kube_config_contexts()
+#     clusters = [context.get("context").get("cluster") for context in contexts]
+#     if "kind-" + spec.get("cluster") not in clusters:
+#         raise kopf.AdmissionError("Application cluster doesn't exist")
+
+#     for component in spec.get("components"):
+#         if "kind-" + component.get("cluster") not in clusters:
+#             raise kopf.AdmissionError(
+#                 f"Cluster of component {component.get('name')} doesn't exist"
+#             )
+
+
+# def _get_application_names() -> list[str]:
+#     try:
+#         kubernetes.config.load_kube_config()
+#         custom_api = kubernetes.client.CustomObjectsApi()
+#         # Replace "group", "version", and "plural" with your CRD details
+#         group = "charity-project.eu"
+#         version = "v1"
+#         plural = "applications"
+#         namespace = "default"
+#         # Get the list of all instances of the "application" CRD in the specified namespace
+#         resource_list = custom_api.list_namespaced_custom_object(
+#             group, version, namespace, plural
+#         )
+#         # Extract and return the application names
+#         return [resource["metadata"]["name"] for resource in resource_list["items"]]
+#     except Exception as _:
+#         raise kopf.AdmissionError("Something went wrong")
+
+
+@kopf.on.validate("Application")
+def validate_app(body, spec, warnings: list[str], **_):
+    # Regex for the application name
+    # application name will be used as a DNS label, see ingress template to understand
+    # Regex source: https://stackoverflow.com/questions/2063213/regular-expression-for-validating-dns-label-host-name
+    regex = re.compile("^(?![0-9]+$)(?!-)[a-zA-Z0-9-]{,63}(?<!-)$")
+    is_match = regex.match(spec.get("name")) is not None
+    if not is_match:
+        raise kopf.AdmissionError("application name must be a valid DNS label name.")
+
+    # Similarly application name must also be valid DNS label.
+    for component in spec.get("components"):
+        is_match = regex.match(component.get("name")) is not None
+        if not is_match:
+            raise kopf.AdmissionError("component name must be a valid DNS label name.")
+
+    # TODO: check clusters regex, and check that cluster exist and are ready
+
+    # Forbidden names : There are some pre-created namespaces when creating a new cluster, for example "default" and "kube-system"..
+    # So the application name must not be one of those names.
+    # TODO: use an api call to get this list instead of hardcoding it.
+    forbidden_names = [
+        "local-path-storage",
+        "kube-system",
+        "kube-public",
+        "kube-node-lease",
+        "ingress-nginx",
+        "monitoring",
+        "default",
+    ]
+
+    if spec.get("name") in forbidden_names:
+        raise kopf.AdmissionError(
+            "application name forbidden, please choose another name for your application."
+        )
+
+    # Cluster must not be the management cluster
+    # Change this to env variable later
+    if spec.get("cluster") == "management-cluster":
+        raise kopf.AdmissionError("cluster must not be the management-cluster")
+
+    for component in spec.get("components"):
+        if component.get("cluster") == "management-cluster":
+            raise kopf.AdmissionError("cluster must not be the management-cluster")
+
+    contexts, _ = kubernetes.config.list_kube_config_contexts()
+    clusters = [context.get("context").get("cluster") for context in contexts]
+    if "kind-" + spec.get("cluster") not in clusters:
+        raise kopf.AdmissionError("Application cluster doesn't exist")
+
+    for component in spec.get("components"):
+        if "kind-" + component.get("cluster") not in clusters:
+            raise kopf.AdmissionError(
+                f"Cluster of component {component.get('name')} doesn't exist"
+            )
+
+    if (
+        "namespace" in body.get("metadata")
+        and body.get("metadata").get("namespace") != "default"
+    ):
+        raise kopf.AdmissionError("namespace must be set to default")
+
+    if body.get("metadata").get("name", "") != spec.get("name"):
+        raise kopf.AdmissionError("metatdata.name must be the same as spec.name")
+
+
+# ---------------------------------- Component-validation ---------------------------------- #
+@kopf.on.validate("Component")
+def validate_comp(body, spec, warnings: list[str], **_):
+    # warnings.append("Verified with the operator's hook. [CREATE OPERATION]")
+    # Regex for the application name
+    # application name and component name will be used as a DNS label, see ingress template to understand
+    # Regex source: https://stackoverflow.com/questions/2063213/regular-expression-for-validating-dns-label-host-name
+    regex = re.compile("^(?![0-9]+$)(?!-)[a-zA-Z0-9-]{,63}(?<!-)$")
+    is_match = regex.match(spec.get("name")) is not None
+    if not is_match:
+        raise kopf.AdmissionError("component name must be a valid DNS label name.")
+
+    is_match = regex.match(spec.get("application")) is not None
+    if not is_match:
+        raise kopf.AdmissionError("application name must be a valid DNS label name.")
+
+    # Check that the application exist
+    # app_module = config.APPS["apps"]
+    # response = app_module.get_app_instance(
+    #     application_name=spec.get("application")
+    # )  # TODO: implement this function
+    # if response is None:
+    #     raise kopf.AdmissionError("Something went wrong!")
+    # elif response.status_code == status.HTTP_404_NOT_FOUND:
+    #     raise kopf.AdmissionError(
+    #         "App instance doesn't exist. you have always to create the application before creating it's components."
+    #     )
+    # elif response.status_code != status.HTTP_200_OK:
+    #     raise kopf.AdmissionError("Something went wrong!")
+
+    # app_instance = response.json()
+    # # check that the component name is registred in the application
+    # components_names = [comp["name"] for comp in app_instance["spec"]["components"]]
+    # if spec.get("name") not in components_names:
+    #     raise kopf.AdmissionError("Component not registred in the application.")
+
+    # is-public must be true only in one port at most
+    temp_list = [exp.get("is-public") for exp in spec.get("expose", [])]
+    if sum(temp_list) > 1:
+        raise kopf.AdmissionError("is-public set to true for two deffirent ports")
+
+    # if is-public = true than, is-peered must be true as well
+    for exp in spec.get("expose", []):
+        if exp.get("is-public") == True and exp.get("is-peered") == False:
+            raise kopf.AdmissionError(
+                "is-public set to true but is-peered set to false"
+            )
+
+    if (
+        "namespace" in body.get("metadata")
+        and body.get("metadata").get("namespace") != "default"
+    ):
+        raise kopf.AdmissionError(f"namespace must be set to default")
+
+    if body.get("metadata").get("name", "") != spec.get("name"):
+        raise kopf.AdmissionError("metatdata.name must be the same as spec.name")
 
 
 # ---------------------------------- APPLICATION-CRD ---------------------------------- #
@@ -28,7 +228,6 @@ def create_app_handler(body, **_):
         )  # TODO: check whether the get context function should be in the app_module or another location, and implement it
         if (response is None) or (response.status_code != status.HTTP_200_OK):
             logging.error(f"Error while retrieving context of {app_cluster} cluster")
-            return
 
         app_cluster_context = response.json().get("context")
         # Now, create the namespcae in the application cluster
@@ -77,13 +276,12 @@ def delete_app_handler(body, **_):
         for component in components_list:
             # Delete the component CRD from the management cluster
             response = app_module.delete_component(
-                component_name=component, app_name=app_name
+                component_name=component["name"], app_name=app_name
             )  # TODO: implement this function
             if (response is None) or (
                 response.status_code != status.HTTP_204_NO_CONTENT
             ):
                 logging.error("Error: app_module.delete_component")
-                return
 
         # 2 - Unpeering and namespace un-offloading, if this will not break the current or another application
         # TODO: .......
@@ -95,14 +293,14 @@ def delete_app_handler(body, **_):
         )  # TODO: check whether the get context function should be in the app_module or another location, and implement it
         if (response is None) or (response.status_code != status.HTTP_200_OK):
             logging.error(f"Error while retrieving context of {app_cluster} cluster")
-            return
+
         app_cluster_context = response.json().get("context")
         response = app_module.delete_namespace(
             namespace_name=app_name, app_cluster_context=app_cluster_context
         )  # TODO: add this function
         if (response is None) or (response.status_code != status.HTTP_204_NO_CONTENT):
             logging.error("Error: app_module.delete_namespace")
-            return
+
     except Exception as _:
         # TODO: handle exceptions
         logging.error("Exception in [on.delete('Application') handler]")
@@ -144,11 +342,11 @@ def update_app_handler(body, old, new, **_):
     for component in removed_components:
         # Delete the component
         response = app_module.delete_component(
-            component_name=component, app_name=body["spec"]["name"]
+            component_name=component["name"], app_name=body["spec"]["name"]
         )  # TODO: implement this function
         if (response is None) or (response.status_code != status.HTTP_204_NO_CONTENT):
             logging.error("Error: app_module.delete_component")
-            return
+
     # TODO: unpeer and un-offload the namespace if it's not needed by the current or another application (removed component)
 
     # 3 - Migration
@@ -177,19 +375,18 @@ def create_comp_handler(body, **_):
         )  # TODO: implement this function
         if response is None:
             logging.error("Something went wrong!")
-            return
+
         elif response.status_code == status.HTTP_404_NOT_FOUND:
             logging.error(
                 "App instance doesn't exist. you have always to create the application before creating it's components."
             )
-            return
+
         elif response.status_code != status.HTTP_200_OK:
             logging.error("Something went wrong!")
-            return
+
         app_instance = response.json()
     except Exception as _:
         logging.error("Exception in [on.create('Component') handler]")
-        return
 
     app_cluster = app_instance["spec"]["cluster"]
 
@@ -197,7 +394,6 @@ def create_comp_handler(body, **_):
     components_names = [comp["name"] for comp in app_instance["spec"]["components"]]
     if body["spec"]["name"] not in components_names:
         logging.error("Component not registred in the application.")
-        return
 
     # Retrieve the component cluster
     for comp in app_instance["spec"]["components"]:
@@ -213,7 +409,6 @@ def create_comp_handler(body, **_):
         )  # TODO: check whether the get context function should be in the app_module or another location, and implement it
         if (resp is None) or (resp.status_code != status.HTTP_200_OK):
             logging.error(f"Error while retrieving context of {app_cluster} cluster")
-            return
 
         app_cluster_context = resp.json().get("context")
         # install the deployment
@@ -222,7 +417,6 @@ def create_comp_handler(body, **_):
         )  # TODO: Customize this function
         if (response is None) or (response.status_code != status.HTTP_201_CREATED):
             logging.error("Error: app_module.install_deployment")
-            return
 
         # Installing service
         # First, we need to filter only the ports where "is-peered" is set to True (is-peered=True)
@@ -238,7 +432,6 @@ def create_comp_handler(body, **_):
             )  # TODO: Customize this function
             if (response is None) or (response.status_code != status.HTTP_201_CREATED):
                 logging.error("Error: app_module.install_service")
-                return
 
         # Installing ServiceMonitor
         # First, we need to filter only the ports where "is-exposing-metrics" is set to True (is-exposing-metrics=True)
@@ -247,14 +440,28 @@ def create_comp_handler(body, **_):
         ]
         if len(exposing_metrics_ports):
             response = app_module.install_servicemonitor(
+                app_name=component["application"],
                 component_name=component["name"],
                 ports_list=exposing_metrics_ports,
                 app_cluster_context=app_cluster_context,
             )  # TODO: add this function
             if (response is None) or (response.status_code != status.HTTP_201_CREATED):
                 logging.error("Error: app_module.install_servicemonitor")
-                return
-        # TODO: Installing ingress, tls-certaficates .......
+
+        # Ingress
+        for exp in component["expose"]:
+            if exp["is-public"] == True:
+                response = app_module.add_host_to_ingress(
+                    app_cluster_context=app_cluster_context,
+                    app_name=component["application"],
+                    component_name=component["name"],
+                    port=exp["clusterPort"],
+                )
+                if (response is None) or (response.status_code != status.HTTP_200_OK):
+                    logging.error("Error: app_module.add_host_to_ingress")
+
+                # Break because is-public could be true only once. [see validation admission webhook]
+                break
 
         # TODO : Check anything else to do .....
     except Exception as _:
@@ -280,12 +487,12 @@ def delete_comp_handler(body, **_):
         )  # TODO: implement this function
         if (response is None) or (response.status_code != status.HTTP_200_OK):
             logging.error("Something went wrong!")
-            return
+
         app_instance = response.json()
     except Exception as _:
         # TODO: handle exceptions
         logging.error("Exception in [on.delete('Component') handler]")
-        return
+
     app_cluster = app_instance["spec"]["cluster"]
 
     # TODO :
@@ -303,7 +510,6 @@ def delete_comp_handler(body, **_):
         )  # TODO: check whether the get context function should be in the app_module or another location, and implement it
         if (resp is None) or (resp.status_code != status.HTTP_200_OK):
             logging.error(f"Error while retrieving context of {app_cluster} cluster")
-            return
 
         app_cluster_context = resp.json().get("context")
         # uninstall the deployment
@@ -314,7 +520,7 @@ def delete_comp_handler(body, **_):
         )  # TODO: Customize this function
         if (response is None) or (response.status_code != status.HTTP_204_NO_CONTENT):
             logging.error("Error: app_module.uninstall_deployment")
-            return
+
         # uninstalling services, servicemonitors, ingresses ...
         if "expose" in component and component["expose"]:
             # Uninstall service
@@ -329,7 +535,7 @@ def delete_comp_handler(body, **_):
                         response.status_code != status.HTTP_204_NO_CONTENT
                     ):
                         logging.error("Error: app_module.uninstall_service")
-                        return
+
                     # Break since we have only one service for each component
                     break
 
@@ -345,13 +551,23 @@ def delete_comp_handler(body, **_):
                         response.status_code != status.HTTP_204_NO_CONTENT
                     ):
                         logging.error("Error: app_module.uninstall_servicemonitor")
-                        return
+
                     # Break since we have only one ServiceMonitor for each component
                     break
 
-            # TODO: Uninstall Ingress and tls-certaficate ......
-
-        # TODO : check what else needs to be done ............
+            # Ingress
+            for exp in component["expose"]:
+                if exp["is-public"] == True:
+                    response = app_module.remove_host_from_ingress(
+                        app_cluster_context=app_cluster_context,
+                        app_name=component["application"],
+                        component_name=component["name"],
+                    )
+                    if (response is None) or (
+                        response.status_code != status.HTTP_200_OK
+                    ):
+                        logging.error("Error: app_module.remove_host_from_ingress")
+                    break
 
     except Exception as _:
         # TODO: handle exeptions
@@ -382,14 +598,14 @@ def update_comp_handler_deployment(body, **_):
         )  # TODO: implement this function
         if (response is None) or (response.status_code != status.HTTP_200_OK):
             logging.error("Something went wrong!")
-            return
+
         app_instance = response.json()
     except Exception as _:
         # TODO: handle exceptions
         logging.error(
             "Exception in [on.update('Component') handler: [update_comp_handler_deployment] function.]"
         )
-        return
+
     app_cluster = app_instance["spec"]["cluster"]
 
     # Retrieve the component cluster
@@ -406,16 +622,16 @@ def update_comp_handler_deployment(body, **_):
         )  # TODO: check whether the get context function should be in the app_module or another location, and implement it
         if (resp is None) or (resp.status_code != status.HTTP_200_OK):
             logging.error(f"Error while retrieving context of {app_cluster} cluster")
-            return
 
         app_cluster_context = resp.json().get("context")
         # Re-apply the deployment (we can rename the "install_deployment" function to "apply_deployment")
+        # ZZZZZZZZ
         response = app_module.install_deployment(
             component=component, app_cluster_context=app_cluster_context
         )
         if (response is None) or (response.status_code != status.HTTP_201_CREATED):
             logging.error("Error: app_module.install_deployment")
-            return
+
     except Exception as _:
         logging.error(
             "Exception in [on.update('Component') handler: [update_comp_handler_deployment] function.]"
@@ -439,7 +655,6 @@ def update_comp_handler_expose_field(body, old, new, **_):
         )  # TODO: implement this function
         if (response is None) or (response.status_code != status.HTTP_200_OK):
             logging.error("Something went wrong!")
-            return
 
         app_instance = response.json()
     except Exception as _:
@@ -447,7 +662,7 @@ def update_comp_handler_expose_field(body, old, new, **_):
         logging.error(
             "Exception in [on.update('Component') handler: [update_comp_handler_expose_field] function.]"
         )
-        return
+
     app_cluster = app_instance["spec"]["cluster"]
 
     # Retrieving the app_cluster context
@@ -456,7 +671,6 @@ def update_comp_handler_expose_field(body, old, new, **_):
     )  # TODO: check whether the get context function should be in the app_module or another location, and implement it
     if (resp is None) or (resp.status_code != status.HTTP_200_OK):
         logging.error(f"Error while retrieving context of {app_cluster} cluster")
-        return
 
     app_cluster_context = resp.json().get("context")
 
@@ -474,7 +688,7 @@ def update_comp_handler_expose_field(body, old, new, **_):
             )  # TODO: Customize this function
             if (response is None) or (response.status_code != status.HTTP_201_CREATED):
                 logging.error("Error: app_module.install_service")
-                return
+
         else:
             # len(peered_ports) = 0 => no port is peered => DELETE the service if it was existing before.
             # Check whether the service was created before
@@ -490,7 +704,6 @@ def update_comp_handler_expose_field(body, old, new, **_):
                     response.status_code != status.HTTP_204_NO_CONTENT
                 ):
                     logging.error("Error: app_module.uninstall_service")
-                    return
 
         # ------------- UPDATE SERVICEMONITOR -------------#
         # Exactly the same logic as above with "Service"
@@ -500,13 +713,13 @@ def update_comp_handler_expose_field(body, old, new, **_):
         if len(exposing_metrics_ports):
             # Re-aplly the service,
             response = app_module.install_servicemonitor(
+                app_name=body["spec"]["application"],
                 component_name=body["spec"]["name"],
                 ports_list=exposing_metrics_ports,
                 app_cluster_context=app_cluster_context,
             )  # TODO: Customize this function
             if (response is None) or (response.status_code != status.HTTP_201_CREATED):
                 logging.error("Error: app_module.install_servicemonitor")
-                return
 
         else:
             old_exposing_metrics_ports = [
@@ -523,10 +736,58 @@ def update_comp_handler_expose_field(body, old, new, **_):
                     response.status_code != status.HTTP_204_NO_CONTENT
                 ):
                     logging.error("Error: app_module.uninstall_servicemonitor")
-                    return
 
         # ------------- UPDATE INGRESS -------------#
-        #  TODO : ........
+
+        # maximum length of this list is 1
+        new_public_port = None
+        for port in new:
+            if port["is-public"] == True:
+                new_public_port = port
+                break
+
+        old_public_port = None
+        for port in old:
+            if port["is-public"] == True:
+                old_public_port = port
+                break
+
+        # The component was not public, and updated to be public
+        if new_public_port is not None and old_public_port is None:
+            response = app_module.add_host_to_ingress(
+                app_cluster_context=app_cluster_context,
+                app_name=body["spec"]["application"],
+                component_name=body["spec"]["name"],
+                port=new_public_port["clusterPort"],
+            )
+            if response is None or response.status_code != status.HTTP_200_OK:
+                logging.error("ERROR: app_module.add_host_to_ingress")
+
+        # The component was public, and updated to be not public
+        if new_public_port is None and old_public_port is not None:
+            response = app_module.remove_host_from_ingress(
+                app_cluster_context=app_cluster_context,
+                app_name=body["spec"]["application"],
+                component_name=body["spec"]["name"],
+            )
+            if response is None or response.status_code != status.HTTP_200_OK:
+                logging.error("ERROR: app_module.remove_host_from_ingress")
+
+        # The port updated
+        if (
+            new_public_port is not None
+            and old_public_port is not None
+            and new_public_port["clusterPort"] != old_public_port["clusterPort"]
+        ):
+            response = app_module.update_host_in_ingress(
+                app_cluster_context=app_cluster_context,
+                app_name=body["spec"]["application"],
+                component_name=body["spec"]["name"],
+                new_port=new_public_port["clusterPort"],
+            )
+            if response is None or response.status_code != status.HTTP_200_OK:
+                logging.error("ERROR: app_module.update_host_in_ingress")
+
     except Exception as _:
         logging.error(
             "Exception in [on.update('Component') handler: [update_comp_handler_expose_field] function.]"

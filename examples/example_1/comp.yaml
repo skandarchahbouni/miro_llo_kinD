@@ -2,14 +2,15 @@ apiVersion: charity-project.eu/v1
 kind: Component
 metadata:
   name: nginx-component
+  namespace: default
 spec:
   application: my-application
   image: nginx:latest
   name: nginx-component
   # replicas: 1
   expose:
-    - is-public: false
-      is-peered: false
+    - is-public: true
+      is-peered: true
       is-exposing-metrics: false
       containerPort: 80
-      clusterPort: 80
+      clusterPort: 8080

@@ -10,6 +10,8 @@ API_URL = "http://127.0.0.1:8000/api/v1"
 # ******************************************************************************* #
 # Common Functions (Used by both 'application-crd' and 'component-crd' operators)
 # ******************************************************************************* #
+
+
 def get_context(cluster: str) -> requests.Response | None:
     """
     - This function should return the context of a k8s cluster based on the cluster name passed as an argument.
@@ -223,7 +225,7 @@ def install_service(
 
 
 def install_servicemonitor(
-    component_name: str, ports_list: list, app_cluster_context: str
+    component_name: str, ports_list: list, app_cluster_context: str, app_name: str
 ) -> requests.Response | None:
     """
     - This function creates a ServiceMonitor in the 'app_cluster'.
@@ -234,6 +236,7 @@ def install_servicemonitor(
     logging.info("install_servicemonitor function is called.")
     url = API_URL + "/servicemonitors"
     body = {
+        "app_name": app_name,
         "component_name": component_name,
         "ports_list": ports_list,
         "app_cluster_context": app_cluster_context,
@@ -315,7 +318,7 @@ def uninstall_servicemonitor(
     """
     logging.info("uninstall_servicemonitor function is called.")
     url = API_URL + f"/servicemonitors/{component_name}"
-    body = {"namespace": app_name, "app_cluster_context": app_cluster_context}
+    body = {"app_name": app_name, "app_cluster_context": app_cluster_context}
     try:
         response = requests.delete(url=url, json=body)
         return response
@@ -329,4 +332,71 @@ def uninstall_servicemonitor(
         logging.error("HTTP Error. [uninstall_servicemonitor function]")
     except requests.exceptions.RequestException as _:
         logging.error("An error occurred. [uninstall_servicemonitor function]")
+    return None
+
+
+# TO BE IMPLEMENTED
+def add_host_to_ingress(
+    app_cluster_context: str, app_name: str, component_name: str, port: int
+) -> requests.Response | None:
+    # we have a single ingress for the whole application, not an ingress for each component
+    logging.info("add_host_to_ingress function is called.")
+    url = API_URL + f"/ingress/{app_name}/hosts/{component_name}"
+    body = {
+        "app_cluster_context": app_cluster_context,
+        "port": port,
+    }
+    try:
+        response = requests.post(url=url, json=body)
+        return response
+    except requests.exceptions.ConnectionError:
+        logging.error("A connection error occurred. [add_host_to_ingress function]")
+    except requests.exceptions.Timeout:
+        logging.error("The request timed out. [add_host_to_ingress function]")
+    except requests.exceptions.HTTPError as _:
+        logging.error("HTTP Error. [add_host_to_ingress function]")
+    except requests.exceptions.RequestException as _:
+        logging.error("An error occurred. [add_host_to_ingress function]")
+    return None
+
+
+def remove_host_from_ingress(
+    app_cluster_context: str, app_name: str, component_name: str
+) -> requests.Response | None:
+    logging.info("remove_host_from_ingress function is called.")
+    url = API_URL + f"/ingress/{app_name}/hosts/{component_name}"
+    body = {"app_cluster_context": app_cluster_context}
+    try:
+        response = requests.delete(url=url, json=body)
+        return response
+    except requests.exceptions.ConnectionError:
+        logging.error(
+            "A connection error occurred. [remove_host_from_ingress function]"
+        )
+    except requests.exceptions.Timeout:
+        logging.error("The request timed out. [remove_host_from_ingress function]")
+    except requests.exceptions.HTTPError as _:
+        logging.error("HTTP Error. [remove_host_from_ingress function]")
+    except requests.exceptions.RequestException as _:
+        logging.error("An error occurred. [remove_host_from_ingress function]")
+    return None
+
+
+def update_host_in_ingress(
+    app_cluster_context: str, app_name: str, component_name: str, new_port: int
+) -> requests.Response | None:
+    logging.info("update_host_in_ingress function is called.")
+    url = API_URL + f"/ingress/{app_name}/hosts/{component_name}"
+    body = {"app_cluster_context": app_cluster_context, "new_port": new_port}
+    try:
+        response = requests.put(url=url, json=body)
+        return response
+    except requests.exceptions.ConnectionError:
+        logging.error("A connection error occurred. [update_host_in_ingress function]")
+    except requests.exceptions.Timeout:
+        logging.error("The request timed out. [update_host_in_ingress function]")
+    except requests.exceptions.HTTPError as _:
+        logging.error("HTTP Error. [update_host_in_ingress function]")
+    except requests.exceptions.RequestException as _:
+        logging.error("An error occurred. [update_host_in_ingress function]")
     return None

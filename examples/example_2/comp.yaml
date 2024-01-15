@@ -5,11 +5,11 @@ metadata:
 spec:
   application: example-app
   image: aimvector/python:metrics
-  name: nginx-component
+  name: comp-1
   # replicas: 1
   expose:
     - is-public: false
       is-peered: true
-      is-exposing-metrics: true
+      is-exposing-metrics: false
       containerPort: 5000
-      clusterPort: 80 
+      clusterPort: 80

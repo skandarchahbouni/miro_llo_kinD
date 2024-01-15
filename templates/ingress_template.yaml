@@ -1,0 +1,18 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{app_name}}-ingress
+spec:
+  rules:
+  {% for host in hosts %}
+    - host: {{host.component_name ~ "." ~ app_name}}.com
+      http:
+        paths:
+          - pathType: Prefix
+            path: /
+            backend:
+              service:
+                name: {{host.component_name}}
+                port:
+                  number: {{host.port}}
+  {% endfor %}

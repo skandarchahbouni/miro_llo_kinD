@@ -6,9 +6,12 @@ metadata:
   namespace: {{ namespace }} # must be set to the namespace where the prometheus instance is looking (application name)
 spec:
   endpoints:
-    - interval: 2s
-      path: /metrics # can be changes !
-      port: {{ component_name ~ "-" ~ cluster_port }} # name of the port that we want to scrape metrics from 
+  {% for exp in expose %}
+    - interval: 30s
+      path: /metrics # can be changed !
+      port: {{ component_name ~ "-" ~ exp.clusterPort }} # name of the port that we want to scrape metrics from
+  {% endfor %}
+    
   selector:
     matchLabels:
       app: {{ component_name }} # component.name to match the service created by the component
