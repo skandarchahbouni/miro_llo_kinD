@@ -1,10 +1,11 @@
 import logging
 import requests
+import os
 
 # from kopf_operator.app_module.exceptions.not_found_exception import NotFoundException
 
 # API_URL = "http://orch-backend.orchestration.charity-project.eu/v1"
-API_URL = "http://127.0.0.1:8000/api/v1"
+API_URL = os.environ.get("API_URL")
 
 
 # ******************************************************************************* #
@@ -168,7 +169,7 @@ def get_changes(old: dict | None, new: dict | None) -> tuple[list, list, list]:
 # Functions Needed by the 'component-crd' Operator
 # ******************************************************************************* #
 def install_deployment(
-    component: dict, app_cluster_context: str
+    component: dict, app_cluster_context: str, update: bool = False
 ) -> requests.Response | None:
     """
     - This function creates a deployment in the "app_cluster".
@@ -178,7 +179,11 @@ def install_deployment(
     """
     logging.info("install_deployment function is called.")
     url = API_URL + "/deployments"
-    body = {"component": component, "app_cluster_context": app_cluster_context}
+    body = {
+        "component": component,
+        "app_cluster_context": app_cluster_context,
+        "update": update,
+    }
     try:
         response = requests.post(url=url, json=body)
         return response
@@ -194,7 +199,11 @@ def install_deployment(
 
 
 def install_service(
-    component_name: str, app_name: str, ports_list: list, app_cluster_context: str
+    component_name: str,
+    app_name: str,
+    ports_list: list,
+    app_cluster_context: str,
+    update: bool = False,
 ) -> requests.Response | None:
     """
     - This function creates a service in the "app_cluster".
@@ -209,6 +218,7 @@ def install_service(
         "app_name": app_name,
         "ports_list": ports_list,
         "app_cluster_context": app_cluster_context,
+        "update": update,
     }
     try:
         response = requests.post(url=url, json=body)
@@ -225,7 +235,11 @@ def install_service(
 
 
 def install_servicemonitor(
-    component_name: str, ports_list: list, app_cluster_context: str, app_name: str
+    component_name: str,
+    ports_list: list,
+    app_cluster_context: str,
+    app_name: str,
+    update: bool = False,
 ) -> requests.Response | None:
     """
     - This function creates a ServiceMonitor in the 'app_cluster'.
@@ -240,6 +254,7 @@ def install_servicemonitor(
         "component_name": component_name,
         "ports_list": ports_list,
         "app_cluster_context": app_cluster_context,
+        "update": update,
     }
     try:
         response = requests.post(url=url, json=body)
@@ -266,7 +281,10 @@ def uninstall_deployment(
     """
     logging.info("uninstall_deployment function is called.")
     url = API_URL + f"/deployments/{component_name}"
-    body = {"app_name": app_name, "app_cluster_context": app_cluster_context}
+    body = {
+        "app_name": app_name,
+        "app_cluster_context": app_cluster_context,
+    }
     try:
         response = requests.delete(url=url, json=body)
         return response

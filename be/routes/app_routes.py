@@ -1,6 +1,6 @@
-import logging
-from fastapi import APIRouter, Request, Body, status
+from fastapi import APIRouter, Body, status
 from controllers import app_controller
+import logging
 
 router = APIRouter()
 log = logging.getLogger(__name__)
@@ -50,22 +50,25 @@ def delete_component(app_name: str, component_name: str):
     )
 
 
-@router.post("/deployments", status_code=status.HTTP_201_CREATED)
+@router.post("/deployments", status_code=status.HTTP_200_OK)
 def install_deployment(
-    app_cluster_context: str = Body(...), component: dict = Body(...)
+    app_cluster_context: str = Body(...),
+    component: dict = Body(...),
+    update: bool = Body(...),
 ):
     logging.info("/deployments POST")
     return app_controller.install_deployment(
-        component=component, app_cluster_context=app_cluster_context
+        component=component, app_cluster_context=app_cluster_context, update=update
     )
 
 
-@router.post("/services", status_code=status.HTTP_201_CREATED)
+@router.post("/services", status_code=status.HTTP_200_OK)
 def install_service(
     component_name: str = Body(...),
     app_name: str = Body(...),
     ports_list: list = Body(...),
     app_cluster_context: str = Body(...),
+    update: bool = Body(...),
 ):
     logging.info("/services POST")
     return app_controller.install_service(
@@ -73,15 +76,17 @@ def install_service(
         app_name=app_name,
         ports_list=ports_list,
         app_cluster_context=app_cluster_context,
+        update=update,
     )
 
 
-@router.post("/servicemonitors", status_code=status.HTTP_201_CREATED)
+@router.post("/servicemonitors", status_code=status.HTTP_200_OK)
 def install_servicemonitor(
     app_name: str = Body(...),
     component_name: str = Body(...),
     ports_list: list = Body(...),
     app_cluster_context: str = Body(...),
+    update: bool = Body(...),
 ):
     logging.info("/servicemonitors POST")
     return app_controller.install_servicemonitor(
@@ -89,12 +94,15 @@ def install_servicemonitor(
         component_name=component_name,
         ports_list=ports_list,
         app_cluster_context=app_cluster_context,
+        update=update,
     )
 
 
 @router.delete("/deployments/{component_name}", status_code=status.HTTP_204_NO_CONTENT)
 def uninstall_deployment(
-    component_name: str, app_cluster_context: str = Body(...), app_name: str = Body(...)
+    component_name: str,
+    app_cluster_context: str = Body(...),
+    app_name: str = Body(...),
 ):
     logging.info(f"/deployments/{component_name} DELETE")
     return app_controller.uninstall_deployment(

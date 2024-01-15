@@ -4,17 +4,17 @@ from kubernetes.config.config_exception import ConfigException
 from jinja2 import Environment, FileSystemLoader
 from fastapi import HTTPException
 import yaml
+import os
 import logging
 
 
 # Global variables (TODO: env variables)
-group = "charity-project.eu"
-version = "v1"
-plural = "applications"
+group = os.environ.get("CRD_GROUP")
+version = os.environ.get("CRD_VERSION")
 
 
 # ADD YOUR PATH HERE
-TEMPLATE_DIR = "/mnt/c/Users/skand/Downloads/PFE/miro_llo_kinD/miro_llo_kinD/templates"
+TEMPLATE_DIR = os.environ.get("TEMPLATE_DIR")
 
 
 # Functions
@@ -32,7 +32,7 @@ def get_app_instance(application_name: str) -> dict | None:
             group=group,
             version=version,
             namespace="default",
-            plural=plural,
+            plural="applications",
             name=application_name,
         )
         return app_instance
@@ -77,7 +77,7 @@ def delete_namespace(namespace_name: str, app_cluster_context: str):
         raise HTTPException(status_code=e.status)
 
 
-def install_deployment(component: dict, app_cluster_context: str):
+def install_deployment(component: dict, app_cluster_context: str, update: bool):
     # Get the deployment template
     try:
         environment = Environment(loader=FileSystemLoader(TEMPLATE_DIR))
@@ -107,10 +107,20 @@ def install_deployment(component: dict, app_cluster_context: str):
     try:
         config.load_kube_config(context=app_cluster_context)
         api_instance = client.AppsV1Api()
-        api_instance.create_namespaced_deployment(
-            body=yaml_output, namespace=component["application"], pretty="true"
-        )
-        logging.info("Deployment created successfully!")
+        if update == False:
+            api_instance.create_namespaced_deployment(
+                body=yaml_output, namespace=component["application"], pretty="true"
+            )
+            logging.info("Deployment created successfully!")
+        else:
+            api_instance.replace_namespaced_deployment(
+                body=yaml_output,
+                namespace=component["application"],
+                name=component["name"],
+                pretty="true",
+            )
+            logging.info("Deployment updated successfully!")
+
     except ConfigException as _:
         logging.error(f"Error: load_kube_config [app_controller.install_deployment]")
         raise HTTPException(status_code=500)
@@ -136,7 +146,11 @@ def uninstall_deployment(component_name: str, app_name: str, app_cluster_context
 
 
 def install_service(
-    component_name: str, app_name: str, ports_list: list, app_cluster_context: str
+    component_name: str,
+    app_name: str,
+    ports_list: list,
+    app_cluster_context: str,
+    update: bool,
 ):
     try:
         # Get template
@@ -160,10 +174,16 @@ def install_service(
     try:
         config.load_kube_config(context=app_cluster_context)
         api_instance = client.CoreV1Api()
-        api_instance.create_namespaced_service(
-            body=yaml_output, namespace=app_name, pretty="true"
-        )
-        logging.info(f"Service created successfully!")
+        if update == False:
+            api_instance.create_namespaced_service(
+                body=yaml_output, namespace=app_name, pretty="true"
+            )
+            logging.info("Service created successfully!")
+        else:
+            api_instance.replace_namespaced_service(
+                body=yaml_output, namespace=app_name, name=component_name, pretty="true"
+            )
+            logging.info("Service updated successfully!")
     except ConfigException as _:
         logging.error("Error: load_kube_config [app_controller.install_service]")
         raise HTTPException(status_code=500)
@@ -188,12 +208,18 @@ def uninstall_service(component_name: str, app_name: str, app_cluster_context: s
 
 # Still other apps to be implemented
 def install_servicemonitor(
-    app_name: str, component_name: str, ports_list: list, app_cluster_context: str
+    app_name: str,
+    component_name: str,
+    ports_list: list,
+    app_cluster_context: str,
+    update: bool,
 ):
     # Get the ServiceMonitor template
     try:
         environment = Environment(loader=FileSystemLoader(TEMPLATE_DIR))
-        ingress_template = environment.get_template("ServiceMonitor_template.yaml")
+        service_monitor_template = environment.get_template(
+            "ServiceMonitor_template.yaml"
+        )
         rendered_service_monitor = service_monitor_template.render(
             namespace=app_name,
             component_name=component_name,
@@ -216,14 +242,25 @@ def install_servicemonitor(
         api_version = yaml_output["apiVersion"]
 
         # Apply the CRD
-        api_instance.create_namespaced_custom_object(
-            group=api_version.split("/")[0],
-            version=api_version.split("/")[1],
-            namespace=app_name,
-            plural="servicemonitors",
-            body=yaml_output,
-        )
-        logging.info(f"ServiceMonitor created successfully!")
+        if update == False:
+            api_instance.create_namespaced_custom_object(
+                group=api_version.split("/")[0],
+                version=api_version.split("/")[1],
+                namespace=app_name,
+                plural="servicemonitors",
+                body=yaml_output,
+            )
+            logging.info("ServiceMonitor created successfully!")
+        else:
+            api_instance.replace_namespaced_custom_object(
+                group=api_version.split("/")[0],
+                version=api_version.split("/")[1],
+                namespace=app_name,
+                name=component_name,
+                plural="servicemonitors",
+                body=yaml_output,
+            )
+            logging.info("ServiceMonitor updated successfully!")
     except ConfigException as _:
         logging.error("Error: load_kube_config [app_controller.install_servicemonitor]")
         raise HTTPException(status_code=500)

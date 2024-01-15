@@ -5,7 +5,8 @@ metadata:
   namespace: default
 spec:
   application: my-application
-  image: nginx:latest
+  image: nginx:1.21.5
+  # image: nginx:latest
   name: nginx-component
   # replicas: 1
   expose:
@@ -13,4 +14,4 @@ spec:
       is-peered: true
       is-exposing-metrics: false
       containerPort: 80
-      clusterPort: 8080
+      clusterPort: 3000
