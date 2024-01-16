@@ -1,9 +1,10 @@
 import kopf
-import logging
 import kubernetes
 from fastapi import status
 import config
+import os
 import re
+import logging
 
 
 # ---------------------------------- ADMISSION WEBHOOKS ---------------------------------- #
@@ -14,88 +15,23 @@ def setup(settings: kopf.OperatorSettings, **_):
 
 
 # ---------------------------------- Application-validation ---------------------------------- #
-# def _validate_app_fields(spec):
-#     # Regex for the application name
-#     # application name will be used as a DNS label, see ingress template to understand
-#     # Regex source: https://stackoverflow.com/questions/2063213/regular-expression-for-validating-dns-label-host-name
-#     regex = re.compile("^(?![0-9]+$)(?!-)[a-zA-Z0-9-]{,63}(?<!-)$")
-#     is_match = regex.match(spec.get("name")) is not None
-#     if not is_match:
-#         raise kopf.AdmissionError("application name must be a valid DNS label name.")
-
-#     # Similarly application name must also be valid DNS label.
-#     for component in spec.get("components"):
-#         is_match = regex.match(component.get("name")) is not None
-#         if not is_match:
-#             raise kopf.AdmissionError("component name must be a valid DNS label name.")
-
-
-#     # Forbidden names : There are some pre-created namespaces when creating a new cluster, for example "default" and "kube-system"..
-#     # So the application name must not be one of those names.
-#     forbidden_names = [
-#         "local-path-storage",
-#         "kube-system",
-#         "kube-public",
-#         "kube-node-lease",
-#         "ingress-nginx",
-#         "monitoring",
-#         "default",
-#     ]
-
-#     if spec.get("name") in forbidden_names:
-#         raise kopf.AdmissionError(
-#             "application name forbidden, please choose another name for your application."
-#         )
-
-#     contexts, _ = kubernetes.config.list_kube_config_contexts()
-#     clusters = [context.get("context").get("cluster") for context in contexts]
-#     if "kind-" + spec.get("cluster") not in clusters:
-#         raise kopf.AdmissionError("Application cluster doesn't exist")
-
-#     for component in spec.get("components"):
-#         if "kind-" + component.get("cluster") not in clusters:
-#             raise kopf.AdmissionError(
-#                 f"Cluster of component {component.get('name')} doesn't exist"
-#             )
-
-
-# def _get_application_names() -> list[str]:
-#     try:
-#         kubernetes.config.load_kube_config()
-#         custom_api = kubernetes.client.CustomObjectsApi()
-#         # Replace "group", "version", and "plural" with your CRD details
-#         group = "charity-project.eu"
-#         version = "v1"
-#         plural = "applications"
-#         namespace = "default"
-#         # Get the list of all instances of the "application" CRD in the specified namespace
-#         resource_list = custom_api.list_namespaced_custom_object(
-#             group, version, namespace, plural
-#         )
-#         # Extract and return the application names
-#         return [resource["metadata"]["name"] for resource in resource_list["items"]]
-#     except Exception as _:
-#         raise kopf.AdmissionError("Something went wrong")
-
-
 @kopf.on.validate("Application")
 def validate_app(body, spec, warnings: list[str], **_):
-    # Regex for the application name
-    # application name will be used as a DNS label, see ingress template to understand
-    # Regex source: https://stackoverflow.com/questions/2063213/regular-expression-for-validating-dns-label-host-name
+    # application name will be used as a DNS label
     regex = re.compile("^(?![0-9]+$)(?!-)[a-zA-Z0-9-]{,63}(?<!-)$")
     is_match = regex.match(spec.get("name")) is not None
     if not is_match:
         raise kopf.AdmissionError("application name must be a valid DNS label name.")
 
-    # Similarly application name must also be valid DNS label.
+    # Similarly componnet name must also be valid DNS label.
     for component in spec.get("components"):
         is_match = regex.match(component.get("name")) is not None
         if not is_match:
             raise kopf.AdmissionError("component name must be a valid DNS label name.")
 
-    # Forbidden names : There are some pre-created namespaces when creating a new cluster, for example "default" and "kube-system"..
+    # Forbidden names : There are some pre-created namespaces when creating a new k8s cluster, for example "default" and "kube-system"..
     # So the application name must not be one of those names.
+    # TODO: configMap
     forbidden_names = [
         "local-path-storage",
         "kube-system",
@@ -112,20 +48,22 @@ def validate_app(body, spec, warnings: list[str], **_):
         )
 
     # Cluster must not be the management cluster
-    # Change this to env variable later
-    if spec.get("cluster") == "management-cluster":
-        raise kopf.AdmissionError("cluster must not be the management-cluster")
+    management_cluster = os.environ.get("MANAGEMENT_CLUSTER")
+    if spec.get("cluster") == management_cluster:
+        raise kopf.AdmissionError(f"cluster must not be the {management_cluster}")
 
     for component in spec.get("components"):
-        if component.get("cluster") == "management-cluster":
-            raise kopf.AdmissionError("cluster must not be the management-cluster")
+        if component.get("cluster") == management_cluster:
+            raise kopf.AdmissionError(f"cluster must not be the {management_cluster}")
 
     contexts, _ = kubernetes.config.list_kube_config_contexts()
     clusters = [context.get("context").get("cluster") for context in contexts]
+    # TODO
     if "kind-" + spec.get("cluster") not in clusters:
         raise kopf.AdmissionError("Application cluster doesn't exist")
 
     for component in spec.get("components"):
+        # TODO
         if "kind-" + component.get("cluster") not in clusters:
             raise kopf.AdmissionError(
                 f"Cluster of component {component.get('name')} doesn't exist"
@@ -144,10 +82,7 @@ def validate_app(body, spec, warnings: list[str], **_):
 # ---------------------------------- Component-validation ---------------------------------- #
 @kopf.on.validate("Component")
 def validate_comp(body, spec, warnings: list[str], **_):
-    # warnings.append("Verified with the operator's hook. [CREATE OPERATION]")
-    # Regex for the application name
     # application name and component name will be used as a DNS label, see ingress template to understand
-    # Regex source: https://stackoverflow.com/questions/2063213/regular-expression-for-validating-dns-label-host-name
     regex = re.compile("^(?![0-9]+$)(?!-)[a-zA-Z0-9-]{,63}(?<!-)$")
     is_match = regex.match(spec.get("name")) is not None
     if not is_match:
@@ -156,26 +91,6 @@ def validate_comp(body, spec, warnings: list[str], **_):
     is_match = regex.match(spec.get("application")) is not None
     if not is_match:
         raise kopf.AdmissionError("application name must be a valid DNS label name.")
-
-    # Check that the application exist
-    # app_module = config.APPS["apps"]
-    # response = app_module.get_app_instance(
-    #     application_name=spec.get("application")
-    # )
-    # if response is None:
-    #     raise kopf.AdmissionError("Something went wrong!")
-    # elif response.status_code == status.HTTP_404_NOT_FOUND:
-    #     raise kopf.AdmissionError(
-    #         "App instance doesn't exist. you have always to create the application before creating it's components."
-    #     )
-    # elif response.status_code != status.HTTP_200_OK:
-    #     raise kopf.AdmissionError("Something went wrong!")
-
-    # app_instance = response.json()
-    # # check that the component name is registred in the application
-    # components_names = [comp["name"] for comp in app_instance["spec"]["components"]]
-    # if spec.get("name") not in components_names:
-    #     raise kopf.AdmissionError("Component not registred in the application.")
 
     # is-public must be true only in one port at most
     temp_list = [exp.get("is-public") for exp in spec.get("expose", [])]
@@ -189,6 +104,7 @@ def validate_comp(body, spec, warnings: list[str], **_):
                 "is-public set to true but is-peered set to false"
             )
 
+    # TODO
     if (
         "namespace" in body.get("metadata")
         and body.get("metadata").get("namespace") != "default"
@@ -209,13 +125,13 @@ def create_app_handler(body, **_):
         - Performs namespace offloading between app clusters and components clusters.
     """
 
-    app_module = config.APPS["apps"]
-
-    # Retireving application cluster and application name from the body
-    app_cluster = body["spec"]["cluster"]
-    app_name = body["spec"]["name"]
-
     try:
+        app_module = config.APPS["apps"]
+
+        # Retireving application cluster and application name from the body
+        app_cluster = body["spec"]["cluster"]
+        app_name = body["spec"]["name"]
+
         # 1- Creating the namespace in the application cluster
         #  Before creating the namespcae, we have to get the context of the application cluster
         response = app_module.get_context(cluster=app_cluster)
@@ -243,9 +159,8 @@ def create_app_handler(body, **_):
                 # TODO: Offload the namespace
                 pass
 
-    except Exception as e:
+    except Exception as _:
         logging.error("Exception in [on.create('Application') handler]")
-        print(e)
 
 
 @kopf.on.delete("Application")
@@ -257,22 +172,25 @@ def delete_app_handler(body, **_):
         - Unoffload the namespace of the application.
         - Deletes the namespace of the application from the application cluster.
     """
-    app_module = config.APPS["apps"]
-
-    # Retireving application cluster and application name from the body
-    app_name = body["spec"]["name"]
-    app_cluster = body["spec"]["cluster"]
-    components_list = body["spec"]["components"]
 
     try:
+        app_module = config.APPS["apps"]
+
+        # Retireving application cluster and application name from the body
+        app_name = body["spec"]["name"]
+        app_cluster = body["spec"]["cluster"]
+        components_list = body["spec"]["components"]
+
         # 1 - Removing all the components of the application
         for component in components_list:
             # Delete the component CRD from the management cluster
             response = app_module.delete_component(
                 component_name=component["name"], app_name=app_name
             )
-            if (response is None) or (
-                response.status_code != status.HTTP_204_NO_CONTENT
+            if (
+                (response is None)
+                or (response.status_code != status.HTTP_204_NO_CONTENT)
+                or (response.status_code != 404)
             ):
                 logging.error("Error: app_module.delete_component")
 
@@ -301,8 +219,6 @@ def delete_app_handler(body, **_):
 # - 01: a new component was added to the application
 # - 02: a component was removed from the application
 # - 03: a component migrated (changed cluster)
-
-
 @kopf.on.update("Application", field="spec.components")
 def update_app_handler(body, old, new, **_):
     """
@@ -356,14 +272,14 @@ def create_comp_handler(body, **_):
     This function:
         - Creates deployment, service, servicemonitor, ingress ... related to the component.
     """
-    app_module = config.APPS["apps"]
 
-    component = body["spec"]
-    # component["name"] = body["metadata"]["name"]
-    application = body["spec"]["application"]
-
-    # 1 - Get the application cluster from the application instance
     try:
+        app_module = config.APPS["apps"]
+
+        component = body["spec"]
+        application = body["spec"]["application"]
+
+        # 1 - Get the application cluster from the application instance
         response = app_module.get_app_instance(application_name=application)
         if response is None:
             logging.error("Something went wrong!")
@@ -464,13 +380,11 @@ def delete_comp_handler(body, **_):
         - Deletes deployment, service, servicemonitor, ingress ... related to the component.
     """
 
-    component = body["spec"]
-    # component["name"] = body["metadata"]["name"]
-    application = body["spec"]["application"]
-    app_module = config.APPS["apps"]
-
-    # 1 - Get the application cluster from the application instance, as well as the component cluster
     try:
+        component = body["spec"]
+        application = body["spec"]["application"]
+        app_module = config.APPS["apps"]
+        # 1 - Get the application cluster from the application instance, as well as the component cluster
         response = app_module.get_app_instance(application_name=application)
         if (response is None) or (response.status_code != status.HTTP_200_OK):
             logging.error("Something went wrong!")
@@ -480,12 +394,6 @@ def delete_comp_handler(body, **_):
         logging.error("Exception in [on.delete('Component') handler]")
 
     app_cluster = app_instance["spec"]["cluster"]
-
-    # !!! IMPORTANT !!! #
-    # Do we need to pass the component cluster in order to delete the deployment ????
-    # The deployment delete should be applied in the app_cluster or in the component_cluster or both ...?
-    # If we have to apply the delete command in the "component cluster", than we have to retrive and pass it's context....(code will change)
-    # !!! IMPORTANT !!! #
 
     # 2 - Delete resources (deployment, service, ingress, servicemonitor ...) related to the component
     try:
@@ -556,10 +464,7 @@ def delete_comp_handler(body, **_):
         logging.error("Exception in [on.delete('Component') handler]")
 
 
-# Please note that this function doesn't handle the update of "expose", "tls" fields.
-# They are handled seperately
-# This function is the same as the beginning create component handler... we can create a function for the common part.
-# The function that handle the update of : 'application_name', '', '' fields. are listed below this handler.
+# Note that this handler doesn't handle the update of "expose", "tls" fields. They are handled seperately
 @kopf.on.update("Component", field="spec")
 def update_comp_handler_deployment(body, **_):
     """
@@ -568,13 +473,12 @@ def update_comp_handler_deployment(body, **_):
     """
     # It will return "unchanged" if the deployment didn't change.
 
-    app_module = config.APPS["apps"]
-    component = body["spec"]
-    # component["name"] = body["metadata"]["name"]
-    application = body["spec"]["application"]
-
-    # 1 - Get the application cluster from the application instance
     try:
+        app_module = config.APPS["apps"]
+        component = body["spec"]
+        application = body["spec"]["application"]
+
+        # 1 - Get the application cluster from the application instance
         response = app_module.get_app_instance(application_name=application)
         if (response is None) or (response.status_code != status.HTTP_200_OK):
             logging.error("Something went wrong!")
@@ -601,7 +505,7 @@ def update_comp_handler_deployment(body, **_):
             logging.error(f"Error while retrieving context of {app_cluster} cluster")
 
         app_cluster_context = resp.json().get("context")
-        # Re-apply the deployment (we can rename the "install_deployment" function to "apply_deployment")
+        # Re-apply the deployment
         response = app_module.install_deployment(
             component=component, app_cluster_context=app_cluster_context, update=True
         )
@@ -622,10 +526,11 @@ def update_comp_handler_expose_field(body, old, new, **_):
         - update the service, ingress, ServiceMonitor, By regenerating the yaml files and applying them again.
         - Delete the service, ingress, srvicemonitor if there is no longer need for them.
     """
-    app_module = config.APPS["apps"]
 
-    # Get the application cluster from the application instance
     try:
+        app_module = config.APPS["apps"]
+
+        # Get the application cluster from the application instance
         response = app_module.get_app_instance(
             application_name=body["spec"]["application"]
         )
@@ -695,7 +600,7 @@ def update_comp_handler_expose_field(body, old, new, **_):
                 update = True
             else:
                 update = False
-            # Re-aplly the service,
+            # Re-aplly the ServiceMonitor
             response = app_module.install_servicemonitor(
                 app_name=body["spec"]["application"],
                 component_name=body["spec"]["name"],
@@ -708,7 +613,7 @@ def update_comp_handler_expose_field(body, old, new, **_):
 
         else:
             if len(old_exposing_metrics_ports):
-                # Delete the service
+                # Delete the ServiceMonitor
                 response = app_module.uninstall_servicemonitor(
                     component_name=body["spec"]["name"],
                     app_name=body["spec"]["application"],

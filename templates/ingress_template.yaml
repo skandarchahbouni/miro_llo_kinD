@@ -5,7 +5,7 @@ metadata:
 spec:
   rules:
   {% for host in hosts %}
-    - host: {{host.component_name ~ "." ~ app_name}}.com
+    - host: {{host.component_name ~ "." ~ app_name}}.onesource.pt
       http:
         paths:
           - pathType: Prefix

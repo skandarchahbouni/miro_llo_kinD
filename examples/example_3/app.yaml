@@ -1,0 +1,13 @@
+apiVersion: charity-project.eu/v1
+kind: Application
+metadata:
+  name: test-app
+spec:
+  owner: john.doe
+  name: test-app
+  cluster: workload-1
+  components:
+    - name: nginx-component
+      cluster: workload-1
+    - name: apache-component
+      cluster: workload-1

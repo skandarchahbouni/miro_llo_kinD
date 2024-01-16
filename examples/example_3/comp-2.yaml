@@ -1,0 +1,16 @@
+apiVersion: charity-project.eu/v1
+kind: Component
+metadata:
+  name: apache-component
+  namespace: default
+spec:
+  application: test-app
+  image: httpd
+  name: apache-component
+  # replicas: 1
+  expose:
+    - is-public: true
+      is-peered: true
+      is-exposing-metrics: false
+      containerPort: 80
+      clusterPort: 4000

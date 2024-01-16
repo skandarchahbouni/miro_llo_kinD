@@ -1,18 +1,13 @@
-import logging
 import requests
 import os
-
-# from kopf_operator.app_module.exceptions.not_found_exception import NotFoundException
+import logging
 
 # API_URL = "http://orch-backend.orchestration.charity-project.eu/v1"
 API_URL = os.environ.get("API_URL")
 
 
-# ******************************************************************************* #
+# TODO: remove the common functions
 # Common Functions (Used by both 'application-crd' and 'component-crd' operators)
-# ******************************************************************************* #
-
-
 def get_context(cluster: str) -> requests.Response | None:
     """
     - This function should return the context of a k8s cluster based on the cluster name passed as an argument.
@@ -54,9 +49,7 @@ def get_app_instance(application_name: str) -> requests.Response | None:
     return None
 
 
-# ******************************************************************************* #
 # Functions Needed by the 'application-crd' Operator
-# ******************************************************************************* #
 def create_namespace(
     namespace_name: str, app_cluster_context: str
 ) -> requests.Response | None:
@@ -353,11 +346,16 @@ def uninstall_servicemonitor(
     return None
 
 
-# TO BE IMPLEMENTED
 def add_host_to_ingress(
     app_cluster_context: str, app_name: str, component_name: str, port: int
 ) -> requests.Response | None:
-    # we have a single ingress for the whole application, not an ingress for each component
+    """
+    This function adds a host in the ingress of the application, or create an ingress if it doesn't already exist.
+    Equivalent to the commands:
+        - kubectl config use-context 'app_cluster_context' # Switch the context to the app_cluster.
+        - get the app ingress, add this component as a host.
+        - kubectl apply -f ingress.yaml --namespace='app_name'.
+    """
     logging.info("add_host_to_ingress function is called.")
     url = API_URL + f"/ingress/{app_name}/hosts/{component_name}"
     body = {
@@ -381,6 +379,16 @@ def add_host_to_ingress(
 def remove_host_from_ingress(
     app_cluster_context: str, app_name: str, component_name: str
 ) -> requests.Response | None:
+    """
+    This function removes a host in the ingress of the application, or delete it if it doesn't already exist.
+    Equivalent to the commands:
+        - kubectl config use-context 'app_cluster_context' # Switch the context to the app_cluster.
+        - get the app ingress, remove this component from the hosts list.
+        - if app has otehr hosts:
+            - kubectl apply -f ingress.yaml --namespace='app_name'.
+        - else:
+            - kubectl apply -f ingress.yaml --namespace='app_name'.
+    """
     logging.info("remove_host_from_ingress function is called.")
     url = API_URL + f"/ingress/{app_name}/hosts/{component_name}"
     body = {"app_cluster_context": app_cluster_context}
@@ -403,6 +411,13 @@ def remove_host_from_ingress(
 def update_host_in_ingress(
     app_cluster_context: str, app_name: str, component_name: str, new_port: int
 ) -> requests.Response | None:
+    """
+    This function update the component host port in the ingress.
+    Equivalent to the commands:
+        - kubectl config use-context 'app_cluster_context' # Switch the context to the app_cluster.
+        - get the app ingress, update the component port number.
+        - kubectl apply -f ingress.yaml --namespace='app_name'.
+    """
     logging.info("update_host_in_ingress function is called.")
     url = API_URL + f"/ingress/{app_name}/hosts/{component_name}"
     body = {"app_cluster_context": app_cluster_context, "new_port": new_port}

@@ -8,18 +8,14 @@ import os
 import logging
 
 
-# Global variables (TODO: env variables)
 group = os.environ.get("CRD_GROUP")
 version = os.environ.get("CRD_VERSION")
-
-
-# ADD YOUR PATH HERE
 TEMPLATE_DIR = os.environ.get("TEMPLATE_DIR")
 
 
-# Functions
 def get_context(cluster: str):
     # In kind we have just to add the "kind-" to the cluster name to get the context
+    # TODO
     return {"context": "kind-" + cluster}
 
 
@@ -164,7 +160,6 @@ def install_service(
 
         yaml_output = yaml.safe_load(rendered_service)
     except Exception as _:
-        # TODO: handle exception
         logging.error(
             "Error: <<app_controller.install_service>> when generating the yaml file"
         )
@@ -237,11 +232,7 @@ def install_servicemonitor(
         # Apply the CRD using the Kubernetes Python client library
         config.load_kube_config(context=app_cluster_context)
         api_instance = client.CustomObjectsApi()
-
-        # creating the ServiceMonitor
         api_version = yaml_output["apiVersion"]
-
-        # Apply the CRD
         if update == False:
             api_instance.create_namespaced_custom_object(
                 group=api_version.split("/")[0],
@@ -297,9 +288,9 @@ def delete_component(component_name: str, app_name: str):
         config.load_kube_config()
         api_instance = client.CustomObjectsApi()
         api_instance.delete_namespaced_custom_object(
-            group="charity-project.eu",
-            version="v1",
-            namespace="default",  # change to app_name or change in the metadata
+            group=group,
+            version=version,
+            namespace="default",  # TODO: change to app_name or change in the metadata
             name=component_name,
             plural="components",
             body=client.V1DeleteOptions(),
@@ -337,7 +328,6 @@ def add_host_to_ingress(
             component_name=component_name,
             hosts=hosts,
         )
-
         yaml_output = yaml.safe_load(rendered_ingress)
     except Exception as _:
         logging.error(
@@ -354,7 +344,7 @@ def add_host_to_ingress(
             api_instance.replace_namespaced_ingress(
                 name=f"{app_name}-ingress", namespace=app_name, body=yaml_output
             )
-            logging.info(f"ingress updated successfully!")
+            logging.info("ingress updated successfully!")
     except ConfigException as _:
         logging.error("Error: load_kube_config [app_controller.add_host_to_ingress]")
         raise HTTPException(status_code=500)
@@ -445,7 +435,6 @@ def update_host_in_ingress(
 
 def _get_existing_hosts(app_cluster_context: str, app_name: str):
     try:
-        # TODO
         config.load_kube_config(context=app_cluster_context)
         api_instance = client.NetworkingV1Api()
         ingress = api_instance.read_namespaced_ingress(

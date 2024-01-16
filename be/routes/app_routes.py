@@ -6,6 +6,7 @@ router = APIRouter()
 log = logging.getLogger(__name__)
 
 
+# TODO: remove unnecessary routes
 @router.get("/clusters/{cluster}/context", status_code=status.HTTP_200_OK)
 def get_context(cluster: str):
     logging.info(f"/clusters/{cluster}/context GET.")
@@ -149,7 +150,7 @@ def add_host_to_ingress(
     app_cluster_context: str = Body(...),
     port: int = Body(...),
 ):
-    logging.info(f"/services/{app_name} DELETE")
+    logging.info(f"/ingress/{app_name}/hosts/{component_name} POST")
     return app_controller.add_host_to_ingress(
         app_cluster_context=app_cluster_context,
         component_name=component_name,
