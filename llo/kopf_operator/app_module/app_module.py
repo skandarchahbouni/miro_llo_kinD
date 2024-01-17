@@ -50,9 +50,7 @@ def get_app_instance(application_name: str) -> requests.Response | None:
 
 
 # Functions Needed by the 'application-crd' Operator
-def create_namespace(
-    namespace_name: str, app_cluster_context: str
-) -> requests.Response | None:
+def create_namespace(namespace_name: str, app_cluster: str) -> requests.Response | None:
     """
     - This function should create a namespace named 'namespace_name' in the 'app_cluster'.
     - Equivalent tot the commands:
@@ -63,7 +61,7 @@ def create_namespace(
     url = API_URL + "/namespaces"
     body = {
         "namespace_name": namespace_name,
-        "app_cluster_context": app_cluster_context,
+        "app_cluster": app_cluster,
     }
     try:
         response = requests.post(url=url, json=body)
@@ -79,9 +77,7 @@ def create_namespace(
     return None
 
 
-def delete_namespace(
-    namespace_name: str, app_cluster_context: str
-) -> requests.Response | None:
+def delete_namespace(namespace_name: str, app_cluster: str) -> requests.Response | None:
     """
     - This function should delete the namespace named 'namespace_name' in the 'app_cluster'.
     - Equivalent tot the commands:
@@ -90,7 +86,7 @@ def delete_namespace(
     """
     logging.info("delete_namespace function is called.")
     url = API_URL + f"/namespaces/{namespace_name}"
-    body = {"app_cluster_context": app_cluster_context}
+    body = {"app_cluster": app_cluster}
     try:
         response = requests.delete(url=url, json=body)
         return response
@@ -162,7 +158,7 @@ def get_changes(old: dict | None, new: dict | None) -> tuple[list, list, list]:
 # Functions Needed by the 'component-crd' Operator
 # ******************************************************************************* #
 def install_deployment(
-    component: dict, app_cluster_context: str, update: bool = False
+    component: dict, app_name: str, update: bool = False
 ) -> requests.Response | None:
     """
     - This function creates a deployment in the "app_cluster".
@@ -174,7 +170,7 @@ def install_deployment(
     url = API_URL + "/deployments"
     body = {
         "component": component,
-        "app_cluster_context": app_cluster_context,
+        "app_name": app_name,
         "update": update,
     }
     try:
@@ -195,7 +191,6 @@ def install_service(
     component_name: str,
     app_name: str,
     ports_list: list,
-    app_cluster_context: str,
     update: bool = False,
 ) -> requests.Response | None:
     """
@@ -210,7 +205,6 @@ def install_service(
         "component_name": component_name,
         "app_name": app_name,
         "ports_list": ports_list,
-        "app_cluster_context": app_cluster_context,
         "update": update,
     }
     try:
@@ -230,7 +224,6 @@ def install_service(
 def install_servicemonitor(
     component_name: str,
     ports_list: list,
-    app_cluster_context: str,
     app_name: str,
     update: bool = False,
 ) -> requests.Response | None:
@@ -246,7 +239,6 @@ def install_servicemonitor(
         "app_name": app_name,
         "component_name": component_name,
         "ports_list": ports_list,
-        "app_cluster_context": app_cluster_context,
         "update": update,
     }
     try:
@@ -264,7 +256,7 @@ def install_servicemonitor(
 
 
 def uninstall_deployment(
-    component_name: str, app_name: str, app_cluster_context: str
+    component_name: str, app_name: str
 ) -> requests.Response | None:
     """
     This function deletes the deployment named 'component_name' in the 'app_name' namespace, in the 'app_cluster' cluster.
@@ -276,7 +268,6 @@ def uninstall_deployment(
     url = API_URL + f"/deployments/{component_name}"
     body = {
         "app_name": app_name,
-        "app_cluster_context": app_cluster_context,
     }
     try:
         response = requests.delete(url=url, json=body)
@@ -292,9 +283,7 @@ def uninstall_deployment(
     return None
 
 
-def uninstall_service(
-    component_name: str, app_name: str, app_cluster_context: str
-) -> requests.Response | None:
+def uninstall_service(component_name: str, app_name: str) -> requests.Response | None:
     """
     This function deletes the deployment named 'component_name' in the 'app_name' namespace, in the 'app_cluster' cluster.
     Equivalent to the commands:
@@ -303,7 +292,7 @@ def uninstall_service(
     """
     logging.info("uninstall_service function is called.")
     url = API_URL + f"/services/{component_name}"
-    body = {"app_name": app_name, "app_cluster_context": app_cluster_context}
+    body = {"app_name": app_name}
     try:
         response = requests.delete(url=url, json=body)
         return response
@@ -319,7 +308,7 @@ def uninstall_service(
 
 
 def uninstall_servicemonitor(
-    component_name: str, app_name: str, app_cluster_context: str
+    component_name: str, app_name: str
 ) -> requests.Response | None:
     """
     This function deletes the ServiceMonitor named 'component_name' in the 'app_name' namespace, in the 'app_cluster' cluster.
@@ -329,7 +318,7 @@ def uninstall_servicemonitor(
     """
     logging.info("uninstall_servicemonitor function is called.")
     url = API_URL + f"/servicemonitors/{component_name}"
-    body = {"app_name": app_name, "app_cluster_context": app_cluster_context}
+    body = {"app_name": app_name}
     try:
         response = requests.delete(url=url, json=body)
         return response
@@ -347,7 +336,7 @@ def uninstall_servicemonitor(
 
 
 def add_host_to_ingress(
-    app_cluster_context: str, app_name: str, component_name: str, port: int
+    app_name: str, component_name: str, port: int
 ) -> requests.Response | None:
     """
     This function adds a host in the ingress of the application, or create an ingress if it doesn't already exist.
@@ -359,7 +348,6 @@ def add_host_to_ingress(
     logging.info("add_host_to_ingress function is called.")
     url = API_URL + f"/ingress/{app_name}/hosts/{component_name}"
     body = {
-        "app_cluster_context": app_cluster_context,
         "port": port,
     }
     try:
@@ -377,7 +365,7 @@ def add_host_to_ingress(
 
 
 def remove_host_from_ingress(
-    app_cluster_context: str, app_name: str, component_name: str
+    app_name: str, component_name: str
 ) -> requests.Response | None:
     """
     This function removes a host in the ingress of the application, or delete it if it doesn't already exist.
@@ -391,9 +379,8 @@ def remove_host_from_ingress(
     """
     logging.info("remove_host_from_ingress function is called.")
     url = API_URL + f"/ingress/{app_name}/hosts/{component_name}"
-    body = {"app_cluster_context": app_cluster_context}
     try:
-        response = requests.delete(url=url, json=body)
+        response = requests.delete(url=url)
         return response
     except requests.exceptions.ConnectionError:
         logging.error(
@@ -409,7 +396,7 @@ def remove_host_from_ingress(
 
 
 def update_host_in_ingress(
-    app_cluster_context: str, app_name: str, component_name: str, new_port: int
+    app_name: str, component_name: str, new_port: int
 ) -> requests.Response | None:
     """
     This function update the component host port in the ingress.
@@ -420,7 +407,7 @@ def update_host_in_ingress(
     """
     logging.info("update_host_in_ingress function is called.")
     url = API_URL + f"/ingress/{app_name}/hosts/{component_name}"
-    body = {"app_cluster_context": app_cluster_context, "new_port": new_port}
+    body = {"new_port": new_port}
     try:
         response = requests.put(url=url, json=body)
         return response

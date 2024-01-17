@@ -132,16 +132,8 @@ def create_app_handler(body, **_):
         app_cluster = body["spec"]["cluster"]
         app_name = body["spec"]["name"]
 
-        # 1- Creating the namespace in the application cluster
-        #  Before creating the namespcae, we have to get the context of the application cluster
-        response = app_module.get_context(cluster=app_cluster)
-        if (response is None) or (response.status_code != status.HTTP_200_OK):
-            logging.error(f"Error while retrieving context of {app_cluster} cluster")
-
-        app_cluster_context = response.json().get("context")
-        # Now, create the namespcae in the application cluster
         response = app_module.create_namespace(
-            namespace_name=app_name, app_cluster_context=app_cluster_context
+            namespace_name=app_name, app_cluster=app_cluster
         )
         if (response is None) or (response.status_code != status.HTTP_201_CREATED):
             logging.error("Error: app_module.create_namespace")
@@ -198,14 +190,8 @@ def delete_app_handler(body, **_):
         # TODO: .......
 
         # 3 Deleting the namespace
-        # Before deleting the namespcae, we have to get the context of the application cluster
-        response = app_module.get_context(cluster=app_cluster)
-        if (response is None) or (response.status_code != status.HTTP_200_OK):
-            logging.error(f"Error while retrieving context of {app_cluster} cluster")
-
-        app_cluster_context = response.json().get("context")
         response = app_module.delete_namespace(
-            namespace_name=app_name, app_cluster_context=app_cluster_context
+            namespace_name=app_name, app_cluster=app_cluster
         )
         if (response is None) or (response.status_code != status.HTTP_204_NO_CONTENT):
             logging.error("Error: app_module.delete_namespace")
@@ -275,51 +261,12 @@ def create_comp_handler(body, **_):
 
     try:
         app_module = config.APPS["apps"]
-
         component = body["spec"]
         application = body["spec"]["application"]
 
-        # 1 - Get the application cluster from the application instance
-        response = app_module.get_app_instance(application_name=application)
-        if response is None:
-            logging.error("Something went wrong!")
-
-        elif response.status_code == status.HTTP_404_NOT_FOUND:
-            logging.error(
-                "App instance doesn't exist. you have always to create the application before creating it's components."
-            )
-
-        elif response.status_code != status.HTTP_200_OK:
-            logging.error("Something went wrong!")
-
-        app_instance = response.json()
-    except Exception as _:
-        logging.error("Exception in [on.create('Component') handler]")
-
-    app_cluster = app_instance["spec"]["cluster"]
-
-    # Confirm that the component is registred in the application
-    components_names = [comp["name"] for comp in app_instance["spec"]["components"]]
-    if body["spec"]["name"] not in components_names:
-        logging.error("Component not registred in the application.")
-
-    # Retrieve the component cluster
-    for comp in app_instance["spec"]["components"]:
-        if (comp["name"] == body["spec"]["name"]) and (comp["cluster"] != app_cluster):
-            component["cluster-selector"] = comp["cluster"]
-            break
-
-    # 2 - Create the needed resources (deployment, service, ingress, servicemonitor ...)
-    try:
-        # Getting the app_cluster context
-        resp = app_module.get_context(cluster=app_cluster)
-        if (resp is None) or (resp.status_code != status.HTTP_200_OK):
-            logging.error(f"Error while retrieving context of {app_cluster} cluster")
-
-        app_cluster_context = resp.json().get("context")
         # install the deployment
         response = app_module.install_deployment(
-            component=component, app_cluster_context=app_cluster_context
+            component=component, app_name=application
         )
         if (response is None) or (response.status_code != status.HTTP_200_OK):
             logging.error("Error: app_module.install_deployment")
@@ -334,7 +281,6 @@ def create_comp_handler(body, **_):
                 component_name=component["name"],
                 app_name=component["application"],
                 ports_list=peered_ports,
-                app_cluster_context=app_cluster_context,
             )
             if (response is None) or (response.status_code != status.HTTP_200_OK):
                 logging.error("Error: app_module.install_service")
@@ -349,7 +295,6 @@ def create_comp_handler(body, **_):
                 app_name=component["application"],
                 component_name=component["name"],
                 ports_list=exposing_metrics_ports,
-                app_cluster_context=app_cluster_context,
             )
             if (response is None) or (response.status_code != status.HTTP_200_OK):
                 logging.error("Error: app_module.install_servicemonitor")
@@ -358,7 +303,6 @@ def create_comp_handler(body, **_):
         for exp in component["expose"]:
             if exp["is-public"] == True:
                 response = app_module.add_host_to_ingress(
-                    app_cluster_context=app_cluster_context,
                     app_name=component["application"],
                     component_name=component["name"],
                     port=exp["clusterPort"],
@@ -384,30 +328,11 @@ def delete_comp_handler(body, **_):
         component = body["spec"]
         application = body["spec"]["application"]
         app_module = config.APPS["apps"]
-        # 1 - Get the application cluster from the application instance, as well as the component cluster
-        response = app_module.get_app_instance(application_name=application)
-        if (response is None) or (response.status_code != status.HTTP_200_OK):
-            logging.error("Something went wrong!")
 
-        app_instance = response.json()
-    except Exception as _:
-        logging.error("Exception in [on.delete('Component') handler]")
-
-    app_cluster = app_instance["spec"]["cluster"]
-
-    # 2 - Delete resources (deployment, service, ingress, servicemonitor ...) related to the component
-    try:
-        # Getting the app_cluster context
-        resp = app_module.get_context(cluster=app_cluster)
-        if (resp is None) or (resp.status_code != status.HTTP_200_OK):
-            logging.error(f"Error while retrieving context of {app_cluster} cluster")
-
-        app_cluster_context = resp.json().get("context")
         # uninstall the deployment
         response = app_module.uninstall_deployment(
             component_name=component["name"],
-            app_name=component["application"],
-            app_cluster_context=app_cluster_context,
+            app_name=application,
         )
         if (response is None) or (response.status_code != status.HTTP_204_NO_CONTENT):
             logging.error("Error: app_module.uninstall_deployment")
@@ -420,7 +345,6 @@ def delete_comp_handler(body, **_):
                     response = app_module.uninstall_service(
                         component_name=component["name"],
                         app_name=component["application"],
-                        app_cluster_context=app_cluster_context,
                     )
                     if (response is None) or (
                         response.status_code != status.HTTP_204_NO_CONTENT
@@ -436,7 +360,6 @@ def delete_comp_handler(body, **_):
                     response = app_module.uninstall_servicemonitor(
                         component_name=component["name"],
                         app_name=component["application"],
-                        app_cluster_context=app_cluster_context,
                     )
                     if (response is None) or (
                         response.status_code != status.HTTP_204_NO_CONTENT
@@ -450,7 +373,6 @@ def delete_comp_handler(body, **_):
             for exp in component["expose"]:
                 if exp["is-public"] == True:
                     response = app_module.remove_host_from_ingress(
-                        app_cluster_context=app_cluster_context,
                         app_name=component["application"],
                         component_name=component["name"],
                     )
@@ -472,42 +394,14 @@ def update_comp_handler_deployment(body, **_):
         - update the deployment related to the component.
     """
     # It will return "unchanged" if the deployment didn't change.
-
     try:
         app_module = config.APPS["apps"]
         component = body["spec"]
         application = body["spec"]["application"]
 
-        # 1 - Get the application cluster from the application instance
-        response = app_module.get_app_instance(application_name=application)
-        if (response is None) or (response.status_code != status.HTTP_200_OK):
-            logging.error("Something went wrong!")
-
-        app_instance = response.json()
-    except Exception as _:
-        logging.error(
-            "Exception in [on.update('Component') handler: [update_comp_handler_deployment] function.]"
-        )
-
-    app_cluster = app_instance["spec"]["cluster"]
-
-    # Retrieve the component cluster
-    for comp in app_instance["spec"]["components"]:
-        if comp["name"] == body["spec"]["name"]:
-            component["cluster-selector"] = comp["cluster"]
-            break
-
-    # 2 - Update the deployment
-    try:
-        # Getting the app_cluster context
-        resp = app_module.get_context(cluster=app_cluster)
-        if (resp is None) or (resp.status_code != status.HTTP_200_OK):
-            logging.error(f"Error while retrieving context of {app_cluster} cluster")
-
-        app_cluster_context = resp.json().get("context")
         # Re-apply the deployment
         response = app_module.install_deployment(
-            component=component, app_cluster_context=app_cluster_context, update=True
+            component=component, app_name=application, update=True
         )
         if (response is None) or (response.status_code != status.HTTP_200_OK):
             logging.error("Error: app_module.install_deployment")
@@ -529,30 +423,6 @@ def update_comp_handler_expose_field(body, old, new, **_):
 
     try:
         app_module = config.APPS["apps"]
-
-        # Get the application cluster from the application instance
-        response = app_module.get_app_instance(
-            application_name=body["spec"]["application"]
-        )
-        if (response is None) or (response.status_code != status.HTTP_200_OK):
-            logging.error("Something went wrong!")
-
-        app_instance = response.json()
-    except Exception as _:
-        logging.error(
-            "Exception in [on.update('Component') handler: [update_comp_handler_expose_field] function.]"
-        )
-
-    app_cluster = app_instance["spec"]["cluster"]
-
-    # Retrieving the app_cluster context
-    resp = app_module.get_context(cluster=app_cluster)
-    if (resp is None) or (resp.status_code != status.HTTP_200_OK):
-        logging.error(f"Error while retrieving context of {app_cluster} cluster")
-
-    app_cluster_context = resp.json().get("context")
-
-    try:
         # ------------- UPDATE SERVICE -------------#
         # filter only the ports where "is-peered" is set to True (is-peered=True)
         peered_ports = [port for port in new if port["is-peered"] == True]
@@ -566,7 +436,6 @@ def update_comp_handler_expose_field(body, old, new, **_):
                 component_name=body["spec"]["name"],
                 app_name=body["spec"]["application"],
                 ports_list=peered_ports,
-                app_cluster_context=app_cluster_context,
                 update=update,
             )
             if (response is None) or (response.status_code != status.HTTP_200_OK):
@@ -580,7 +449,6 @@ def update_comp_handler_expose_field(body, old, new, **_):
                 response = app_module.uninstall_service(
                     component_name=body["spec"]["name"],
                     app_name=body["spec"]["application"],
-                    app_cluster_context=app_cluster_context,
                 )
                 if (response is None) or (
                     response.status_code != status.HTTP_204_NO_CONTENT
@@ -605,7 +473,6 @@ def update_comp_handler_expose_field(body, old, new, **_):
                 app_name=body["spec"]["application"],
                 component_name=body["spec"]["name"],
                 ports_list=exposing_metrics_ports,
-                app_cluster_context=app_cluster_context,
                 update=update,
             )
             if (response is None) or (response.status_code != status.HTTP_200_OK):
@@ -617,7 +484,6 @@ def update_comp_handler_expose_field(body, old, new, **_):
                 response = app_module.uninstall_servicemonitor(
                     component_name=body["spec"]["name"],
                     app_name=body["spec"]["application"],
-                    app_cluster_context=app_cluster_context,
                 )
                 if (response is None) or (
                     response.status_code != status.HTTP_204_NO_CONTENT
@@ -642,7 +508,6 @@ def update_comp_handler_expose_field(body, old, new, **_):
         # The component was not public, and updated to be public
         if new_public_port is not None and old_public_port is None:
             response = app_module.add_host_to_ingress(
-                app_cluster_context=app_cluster_context,
                 app_name=body["spec"]["application"],
                 component_name=body["spec"]["name"],
                 port=new_public_port["clusterPort"],
@@ -653,7 +518,6 @@ def update_comp_handler_expose_field(body, old, new, **_):
         # The component was public, and updated to be not public
         if new_public_port is None and old_public_port is not None:
             response = app_module.remove_host_from_ingress(
-                app_cluster_context=app_cluster_context,
                 app_name=body["spec"]["application"],
                 component_name=body["spec"]["name"],
             )
@@ -667,7 +531,6 @@ def update_comp_handler_expose_field(body, old, new, **_):
             and new_public_port["clusterPort"] != old_public_port["clusterPort"]
         ):
             response = app_module.update_host_in_ingress(
-                app_cluster_context=app_cluster_context,
                 app_name=body["spec"]["application"],
                 component_name=body["spec"]["name"],
                 new_port=new_public_port["clusterPort"],
@@ -679,13 +542,3 @@ def update_comp_handler_expose_field(body, old, new, **_):
         logging.error(
             "Exception in [on.update('Component') handler: [update_comp_handler_expose_field] function.]"
         )
-
-
-# Handler for the tls field
-@kopf.on.update("Component", field="spec.tls")
-def update_comp_handler_tls_field(old, new, **_):
-    """
-    - This function:
-        - ........
-    """
-    pass
