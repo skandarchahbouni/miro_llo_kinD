@@ -1,4 +1,4 @@
-apiVersion: charity-project.eu/v1
+apiVersion: miro.onesource.pt/v1
 kind: Component
 metadata:
   name: python-component
@@ -10,7 +10,7 @@ spec:
   # replicas: 1
   expose:
     - is-public: false
-      is-peered: true
+      is-peered: false
       is-exposing-metrics: true
       containerPort: 5000
       clusterPort: 80

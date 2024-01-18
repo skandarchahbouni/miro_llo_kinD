@@ -1,4 +1,4 @@
-apiVersion: charity-project.eu/v1
+apiVersion: miro.onesource.pt/v1
 kind: Application
 metadata:
   name: test-app
@@ -9,5 +9,5 @@ spec:
   components:
     - name: nginx-component
       cluster: kind-workload-2
-    # - name: python-component
-    #   cluster: kind-workload-2
+    - name: python-component
+      cluster: kind-workload-2

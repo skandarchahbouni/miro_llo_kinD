@@ -1,4 +1,4 @@
-apiVersion: charity-project.eu/v1
+apiVersion: miro.onesource.pt/v1
 kind: Component
 metadata:
   name: nginx-component

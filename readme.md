@@ -63,7 +63,7 @@
 - Add the following lines to `~/.bashrc` (or equivalent):
   - `export API_URL='http://127.0.0.1:8000/api/v1'`
   - `export TEMPLATE_DIR='YOUR_PATH_TO_TEMPLATES_HERE'` <!-- Example: `export TEMPLATE_DIR='/mnt/c/Users/skand/Downloads/PFE/miro_llo_kinD/miro_llo_kinD/templates'` -->
-  - `export CRD_GROUP='charity-project.eu'`
+  - `export CRD_GROUP='miro.onesource.pt'`
   - `export CRD_VERSION='v1'`
   - `export MANAGEMENT_CLUSTER='YOUR_MANAGEMENT_CLUSTER_NAME'` <!-- Example: `export MANAGEMENT_CLUSTER='management-cluster'` -->
   - `export FORBIDDEN_NAMES='local-path-storage,kube-system,kube-public,kube-node-lease,ingress-nginx,monitoring,default'`
@@ -105,7 +105,7 @@
     - `kubectl port-forward svc/prometheus-operated 9090:9090 -n monitoring`
     - Visit http://localhost:9090/graph in your browser to confirm.
 - To test hosts within the Ingress:
-  - Add hosts to the hosts.txt file in either "C:\Windows\System32\drivers\etc\hosts" or "/etc/hosts" for Linux.
+  - Add hosts to the "hosts" file in either "C:\Windows\System32\drivers\etc\hosts" or "/etc/hosts" for Linux.
   - Port forward the NodePort service within the workload cluster:
     - `kubectl port-forward svc/ingress-nginx-controller 80:80 -n ingress-nginx`
   - Access the specified URL in the Ingress in your browser.
@@ -118,3 +118,6 @@
   - One to run the operator.
   - One to execute commands (`kubectl apply -f ...`).
 - You will frequently need to switch the context between clusters and namespaces, making it more convenient to install the `kubectx` and `kubens` commands.
+
+## Quick demo:
+- You can view a quick demo via this [link](https://drive.google.com/file/d/1SmXic5TtOZNIYLTRFvr6lSF9BXHx6ptJ/view?usp=sharing).
