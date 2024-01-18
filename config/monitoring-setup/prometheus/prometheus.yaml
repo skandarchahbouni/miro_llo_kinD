@@ -1,0 +1,57 @@
+---
+apiVersion: monitoring.coreos.com/v1
+kind: Prometheus
+metadata:
+  name: staging
+  namespace: monitoring
+spec:
+  externalUrl: http://monitoring.my.systems/prometheus
+  version: v2.43.1
+  serviceAccountName: prometheus
+  podMonitorSelector:
+    {}
+    # matchLabels:
+    #   prometheus: main
+  podMonitorNamespaceSelector:
+    {}
+    # matchLabels:
+    #   monitoring: prometheus
+  serviceMonitorSelector:
+    {}
+    # matchLabels:
+    #   prometheus: main
+  serviceMonitorNamespaceSelector:
+    {}
+    # matchLabels:
+    #   monitoring: prometheus
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 2Gi
+  replicas: 1
+  logLevel: info
+  logFormat: logfmt
+  retention: 6h
+  scrapeInterval: 2s
+  securityContext:
+    fsGroup: 0
+    runAsNonRoot: false
+    runAsUser: 0
+  storage:
+    volumeClaimTemplate:
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: "manual"
+        resources:
+          requests:
+            storage: 4Gi
+  # Thanos Sidecar
+  thanos:
+    version: v0.31.0
+#    objectStorageConfig:
+#      name: objstore
+#      key: objstore.yml
+

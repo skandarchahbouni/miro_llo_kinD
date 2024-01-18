@@ -1,9 +1,0 @@
-apiVersion: v1
-kind: Pod
-metadata:
-  name: failed-pod
-spec:
-  containers:
-  - name: my-container
-    image: busybox:latest
-    command: ["sh", "-c", "exit 1"]  # Intentionally fail

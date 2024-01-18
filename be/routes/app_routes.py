@@ -6,19 +6,6 @@ router = APIRouter()
 log = logging.getLogger(__name__)
 
 
-# TODO: remove unnecessary routes
-@router.get("/clusters/{cluster}/context", status_code=status.HTTP_200_OK)
-def get_context(cluster: str):
-    logging.info(f"/clusters/{cluster}/context GET.")
-    return app_controller.get_context(cluster=cluster)
-
-
-@router.get("/applications/{application_name}", status_code=status.HTTP_200_OK)
-def get_app_instance(application_name: str):
-    logging.info(f"/applications/{application_name} GET")
-    return app_controller.get_app_instance(application_name=application_name)
-
-
 @router.post("/namespaces", status_code=status.HTTP_201_CREATED)
 def create_namespace(
     namespace_name: str = Body(...),
@@ -122,7 +109,7 @@ def uninstall_servicemonitor(
 ):
     logging.info(f"/servicemonitors/{component_name} DELETE")
     app_controller.uninstall_servicemonitor(
-        app_name=app_name,
+        app_name=app_name, component_name=component_name
     )
 
 
@@ -161,7 +148,7 @@ def remove_host_from_ingress(
 def update_host_in_ingress(
     app_name: str,
     component_name: str,
-    new_port: int = Body(...),
+    new_port: int = Body(..., embed=True),
 ):
     logging.info(f"/ingress/{app_name}/hosts/{component_name} PUT")
     return app_controller.update_host_in_ingress(

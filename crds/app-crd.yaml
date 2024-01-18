@@ -27,12 +27,10 @@ spec:
                 - name
                 - cluster
                 - components
-                # - owner
               properties:
                 name:
                   type: string
                   maxLength: 63
-                  # pattern: "^[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?$" # The application will be used as a DNS label (see ingress hosts)
                 cluster:
                   type: string
                 owner:
@@ -48,7 +46,6 @@ spec:
                       name:
                         type: string
                         maxLength: 63
-                        # pattern:  # The application will be used as a DNS label (see ingress hosts)
                       cluster:
                         type: string
 

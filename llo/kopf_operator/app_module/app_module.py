@@ -2,54 +2,11 @@ import requests
 import os
 import logging
 
-# API_URL = "http://orch-backend.orchestration.charity-project.eu/v1"
+# API_URL = "http://orch-backend.orchestration.miro.onesource.pt/v1"
 API_URL = os.environ.get("API_URL")
 
 
-# TODO: remove the common functions
-# Common Functions (Used by both 'application-crd' and 'component-crd' operators)
-def get_context(cluster: str) -> requests.Response | None:
-    """
-    - This function should return the context of a k8s cluster based on the cluster name passed as an argument.
-    """
-    logging.info("get_context function is called.")
-    url = API_URL + f"/clusters/{cluster}/context"
-    try:
-        response = requests.get(url=url)
-        return response
-    except requests.exceptions.ConnectionError:
-        logging.error("A connection error occurred. [get_context function]")
-    except requests.exceptions.Timeout:
-        logging.error("The request timed out. [get_context function]")
-    except requests.exceptions.HTTPError as _:
-        logging.error("HTTP Error. [get_context function]")
-    except requests.exceptions.RequestException as _:
-        logging.error("An error occurred. [get_context function]")
-    return None
-
-
-def get_app_instance(application_name: str) -> requests.Response | None:
-    """
-    - This function returns the application instance named "application_name".
-    - Euivalent to run the command: <<kubectl get apps "application_name">> in the management cluster.
-    """
-    logging.info("get_app_instance function is called.")
-    url = API_URL + f"/applications/{application_name}"
-    try:
-        response = requests.get(url=url)
-        return response
-    except requests.exceptions.ConnectionError:
-        logging.error("A connection error occurred. [get_app_instance function]")
-    except requests.exceptions.Timeout:
-        logging.error("The request timed out. [get_app_instance function]")
-    except requests.exceptions.HTTPError as _:
-        logging.error("HTTP Error. [get_app_instance function]")
-    except requests.exceptions.RequestException as _:
-        logging.error("An error occurred. [get_app_instance function]")
-    return None
-
-
-# Functions Needed by the 'application-crd' Operator
+# ---------------------------------- Functions Needed by the 'application-crd' Operator ---------------------------------- #
 def create_namespace(namespace_name: str, app_cluster: str) -> requests.Response | None:
     """
     - This function should create a namespace named 'namespace_name' in the 'app_cluster'.
@@ -154,9 +111,7 @@ def get_changes(old: dict | None, new: dict | None) -> tuple[list, list, list]:
     return added_components, removed_components, migrated_components
 
 
-# ******************************************************************************* #
-# Functions Needed by the 'component-crd' Operator
-# ******************************************************************************* #
+# ---------------------------------- Functions Needed by the 'component-crd' Operator ---------------------------------- #
 def install_deployment(
     component: dict, app_name: str, update: bool = False
 ) -> requests.Response | None:

@@ -1,0 +1,16 @@
+apiVersion: charity-project.eu/v1
+kind: Component
+metadata:
+  name: python-component
+  namespace: test-app
+spec:
+  application: test-app
+  image: aimvector/python:metrics
+  name: python-component
+  # replicas: 1
+  expose:
+    - is-public: false
+      is-peered: true
+      is-exposing-metrics: true
+      containerPort: 5000
+      clusterPort: 80

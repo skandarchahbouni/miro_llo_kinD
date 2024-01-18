@@ -31,16 +31,8 @@ def validate_app(body, spec, warnings: list[str], **_):
 
     # Forbidden names : There are some pre-created namespaces when creating a new k8s cluster, for example "default" and "kube-system"..
     # So the application name must not be one of those names.
-    # TODO: configMap
-    forbidden_names = [
-        "local-path-storage",
-        "kube-system",
-        "kube-public",
-        "kube-node-lease",
-        "ingress-nginx",
-        "monitoring",
-        "default",
-    ]
+
+    forbidden_names = os.environ.get("FORBIDDEN_NAMES").split(",")
 
     if spec.get("name") in forbidden_names:
         raise kopf.AdmissionError(
@@ -58,13 +50,11 @@ def validate_app(body, spec, warnings: list[str], **_):
 
     contexts, _ = kubernetes.config.list_kube_config_contexts()
     clusters = [context.get("context").get("cluster") for context in contexts]
-    # TODO
-    if "kind-" + spec.get("cluster") not in clusters:
+    if spec.get("cluster") not in clusters:
         raise kopf.AdmissionError("Application cluster doesn't exist")
 
     for component in spec.get("components"):
-        # TODO
-        if "kind-" + component.get("cluster") not in clusters:
+        if component.get("cluster") not in clusters:
             raise kopf.AdmissionError(
                 f"Cluster of component {component.get('name')} doesn't exist"
             )
@@ -104,12 +94,10 @@ def validate_comp(body, spec, warnings: list[str], **_):
                 "is-public set to true but is-peered set to false"
             )
 
-    # TODO
-    if (
-        "namespace" in body.get("metadata")
-        and body.get("metadata").get("namespace") != "default"
-    ):
-        raise kopf.AdmissionError(f"namespace must be set to default")
+    if "namespace" in body.get("metadata") and body.get("metadata").get(
+        "namespace"
+    ) != spec.get("application"):
+        raise kopf.AdmissionError(f"namespace must be set to {spec.get('application')}")
 
     if body.get("metadata").get("name", "") != spec.get("name"):
         raise kopf.AdmissionError("metatdata.name must be the same as spec.name")
@@ -132,13 +120,14 @@ def create_app_handler(body, **_):
         app_cluster = body["spec"]["cluster"]
         app_name = body["spec"]["name"]
 
+        # Create namesapce in the app_cluster
         response = app_module.create_namespace(
             namespace_name=app_name, app_cluster=app_cluster
         )
         if (response is None) or (response.status_code != status.HTTP_201_CREATED):
             logging.error("Error: app_module.create_namespace")
 
-        # 2- Linking between the app_cluster and the components clusters
+        # Linking between the app_cluster and the components clusters
         components_list = body["spec"]["components"]
 
         # Unique list of components clusters
@@ -173,7 +162,7 @@ def delete_app_handler(body, **_):
         app_cluster = body["spec"]["cluster"]
         components_list = body["spec"]["components"]
 
-        # 1 - Removing all the components of the application
+        # Removing all the components of the application
         for component in components_list:
             # Delete the component CRD from the management cluster
             response = app_module.delete_component(
@@ -423,6 +412,8 @@ def update_comp_handler_expose_field(body, old, new, **_):
 
     try:
         app_module = config.APPS["apps"]
+        component_name = body["spec"]["name"]
+        application = body["spec"]["application"]
         # ------------- UPDATE SERVICE -------------#
         # filter only the ports where "is-peered" is set to True (is-peered=True)
         peered_ports = [port for port in new if port["is-peered"] == True]
@@ -433,8 +424,8 @@ def update_comp_handler_expose_field(body, old, new, **_):
             else:
                 update = False
             response = app_module.install_service(
-                component_name=body["spec"]["name"],
-                app_name=body["spec"]["application"],
+                component_name=component_name,
+                app_name=application,
                 ports_list=peered_ports,
                 update=update,
             )
@@ -447,8 +438,8 @@ def update_comp_handler_expose_field(body, old, new, **_):
             if len(old_peered_ports):
                 # Delete the service
                 response = app_module.uninstall_service(
-                    component_name=body["spec"]["name"],
-                    app_name=body["spec"]["application"],
+                    component_name=component_name,
+                    app_name=application,
                 )
                 if (response is None) or (
                     response.status_code != status.HTTP_204_NO_CONTENT
@@ -470,8 +461,8 @@ def update_comp_handler_expose_field(body, old, new, **_):
                 update = False
             # Re-aplly the ServiceMonitor
             response = app_module.install_servicemonitor(
-                app_name=body["spec"]["application"],
-                component_name=body["spec"]["name"],
+                app_name=application,
+                component_name=component_name,
                 ports_list=exposing_metrics_ports,
                 update=update,
             )
@@ -482,8 +473,8 @@ def update_comp_handler_expose_field(body, old, new, **_):
             if len(old_exposing_metrics_ports):
                 # Delete the ServiceMonitor
                 response = app_module.uninstall_servicemonitor(
-                    component_name=body["spec"]["name"],
-                    app_name=body["spec"]["application"],
+                    component_name=component_name,
+                    app_name=application,
                 )
                 if (response is None) or (
                     response.status_code != status.HTTP_204_NO_CONTENT
@@ -508,8 +499,8 @@ def update_comp_handler_expose_field(body, old, new, **_):
         # The component was not public, and updated to be public
         if new_public_port is not None and old_public_port is None:
             response = app_module.add_host_to_ingress(
-                app_name=body["spec"]["application"],
-                component_name=body["spec"]["name"],
+                app_name=application,
+                component_name=component_name,
                 port=new_public_port["clusterPort"],
             )
             if response is None or response.status_code != status.HTTP_200_OK:
@@ -518,8 +509,8 @@ def update_comp_handler_expose_field(body, old, new, **_):
         # The component was public, and updated to be not public
         if new_public_port is None and old_public_port is not None:
             response = app_module.remove_host_from_ingress(
-                app_name=body["spec"]["application"],
-                component_name=body["spec"]["name"],
+                app_name=application,
+                component_name=component_name,
             )
             if response is None or response.status_code != status.HTTP_200_OK:
                 logging.error("ERROR: app_module.remove_host_from_ingress")
@@ -531,8 +522,8 @@ def update_comp_handler_expose_field(body, old, new, **_):
             and new_public_port["clusterPort"] != old_public_port["clusterPort"]
         ):
             response = app_module.update_host_in_ingress(
-                app_name=body["spec"]["application"],
-                component_name=body["spec"]["name"],
+                app_name=application,
+                component_name=component_name,
                 new_port=new_public_port["clusterPort"],
             )
             if response is None or response.status_code != status.HTTP_200_OK:

@@ -13,76 +13,18 @@ version = os.environ.get("CRD_VERSION")
 TEMPLATE_DIR = os.environ.get("TEMPLATE_DIR")
 
 
-# TODO : remove this
-def get_context(cluster: str):
-    # In kind we have just to add the "kind-" to the cluster name to get the context
-    # TODO
-    return {"context": "kind-" + cluster}
-
-
-def _get_context(cluster: str) -> str:
-    # In kind we have just to add the "kind-" to the cluster name to get the context
-    # TODO
-    return "kind-" + cluster
-
-
-def _get_app_and_comp_cluster(
-    app_name: str, component_name: str
-) -> tuple[str | None, str | None]:
-    try:
-        config.load_kube_config()
-        custom_objects_api = client.CustomObjectsApi()
-        # Get the Custom Resource
-        app_instance = custom_objects_api.get_namespaced_custom_object(
-            group=group,
-            version=version,
-            namespace="default",
-            plural="applications",
-            name=app_name,
-        )
-        # Application cluster
-        app_cluster = app_instance["spec"]["cluster"]
-        # Component cluster
-        comp_cluster = None
-        for component in app_instance["spec"]["components"]:
-            if component["name"] == component_name:
-                comp_cluster = component["cluster"]
-                break
-        return app_cluster, comp_cluster
-    except ConfigException as _:
-        logging.error("Error: load_kube_config [app_controller.get_app_instance]")
-        raise HTTPException(status_code=500)
-    except ApiException as e:
-        logging.error("Error: app_controller.get_app_instance")
-        raise HTTPException(status_code=e.status)
-
-
-def get_app_instance(application_name: str) -> dict | None:
-    try:
-        config.load_kube_config()
-        custom_objects_api = client.CustomObjectsApi()
-        # Get the Custom Resource
-        app_instance = custom_objects_api.get_namespaced_custom_object(
-            group=group,
-            version=version,
-            namespace="default",
-            plural="applications",
-            name=application_name,
-        )
-        return app_instance
-    except ConfigException as _:
-        logging.error("Error: load_kube_config [app_controller.get_app_instance]")
-        raise HTTPException(status_code=500)
-    except ApiException as e:
-        logging.error("Error: app_controller.get_app_instance")
-        raise HTTPException(status_code=e.status)
-
-
 def create_namespace(namespace_name: str, app_cluster: str):
     try:
-        # TODO: create the namespace even in the management cluster
+        # Create namespace in the app cluster
         app_cluster_context = _get_context(cluster=app_cluster)
         config.load_kube_config(context=app_cluster_context)
+        api_instance = client.CoreV1Api()
+        new_namespace = client.V1Namespace(
+            metadata=client.V1ObjectMeta(name=namespace_name)
+        )
+        api_instance.create_namespace(body=new_namespace)
+        # Create namespace in the management cluster
+        config.load_kube_config()
         api_instance = client.CoreV1Api()
         new_namespace = client.V1Namespace(
             metadata=client.V1ObjectMeta(name=namespace_name)
@@ -99,8 +41,15 @@ def create_namespace(namespace_name: str, app_cluster: str):
 
 def delete_namespace(namespace_name: str, app_cluster: str):
     try:
+        # Delete namespace in the app_cluster
         app_cluster_context = _get_context(app_cluster)
         config.load_kube_config(context=app_cluster_context)
+        api_instance = client.CoreV1Api()
+        api_instance.delete_namespace(
+            name=namespace_name, body=client.V1DeleteOptions()
+        )
+        # Delete namespace in the management-cluster
+        config.load_kube_config()
         api_instance = client.CoreV1Api()
         api_instance.delete_namespace(
             name=namespace_name, body=client.V1DeleteOptions()
@@ -322,6 +271,17 @@ def install_servicemonitor(
             )
             logging.info("ServiceMonitor created successfully!")
         else:
+            # First get the resourceVersion of the serviceMonitor
+            existing_servicemonitor = api_instance.get_namespaced_custom_object(
+                group=api_version.split("/")[0],
+                version=api_version.split("/")[1],
+                namespace=app_name,
+                name=component_name,
+                plural="servicemonitors",
+            )
+            resource_version = existing_servicemonitor["metadata"]["resourceVersion"]
+            yaml_output["metadata"]["resourceVersion"] = resource_version
+            # Update
             api_instance.replace_namespaced_custom_object(
                 group=api_version.split("/")[0],
                 version=api_version.split("/")[1],
@@ -374,7 +334,7 @@ def delete_component(component_name: str, app_name: str):
         api_instance.delete_namespaced_custom_object(
             group=group,
             version=version,
-            namespace="default",  # TODO: change to app_name or change in the metadata
+            namespace=app_name,
             name=component_name,
             plural="components",
             body=client.V1DeleteOptions(),
@@ -530,6 +490,49 @@ def update_host_in_ingress(component_name: str, app_name: str, new_port: int):
         raise HTTPException(status_code=e.status)
     except Exception as _:
         raise HTTPException(status_code=500)
+
+
+# ---------------------------------- Helper functions ---------------------------------- #
+def _get_context(cluster: str) -> str:
+    contexts, _ = config.list_kube_config_contexts()
+    for context in contexts:
+        cluster_name = context["context"]["cluster"]
+        if cluster_name == cluster:
+            return context["name"]
+    # Raise exception if cluster not found
+    logging.error("ERROR: cluster context not found! [_get_context]")
+    raise HTTPException(status_code=500)
+
+
+def _get_app_and_comp_cluster(
+    app_name: str, component_name: str
+) -> tuple[str | None, str | None]:
+    try:
+        config.load_kube_config()
+        custom_objects_api = client.CustomObjectsApi()
+        # Get the Custom Resource
+        app_instance = custom_objects_api.get_namespaced_custom_object(
+            group=group,
+            version=version,
+            namespace="default",
+            plural="applications",
+            name=app_name,
+        )
+        # Application cluster
+        app_cluster = app_instance["spec"]["cluster"]
+        # Component cluster
+        comp_cluster = None
+        for component in app_instance["spec"]["components"]:
+            if component["name"] == component_name:
+                comp_cluster = component["cluster"]
+                break
+        return app_cluster, comp_cluster
+    except ConfigException as _:
+        logging.error("Error: load_kube_config [app_controller.get_app_instance]")
+        raise HTTPException(status_code=500)
+    except ApiException as e:
+        logging.error("Error: app_controller.get_app_instance")
+        raise HTTPException(status_code=e.status)
 
 
 def _get_existing_hosts(app_cluster_context: str, app_name: str):

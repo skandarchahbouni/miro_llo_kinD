@@ -30,13 +30,11 @@ spec:
                 name:
                   type: string
                   maxLength: 63
-                  # pattern:
                 application:
                   type: string
                   maxLength: 63
                 image:
                   type: string
-                  # TODO: add regex
                 replicas:
                   type: integer
                   minimum: 1

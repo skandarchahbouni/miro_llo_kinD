@@ -1,0 +1,41 @@
+
+#########################################################
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-service-deployment
+  namespace: testing
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: my-service
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+  minReadySeconds: 5
+  template:
+    metadata:
+      namespace: production
+      labels:
+        app: my-service
+    spec:
+      nodeSelector:
+        kubernetes.io/os: linux
+      containers:
+        - name: my-service-pod
+          image: myacr.azurecr.io/my_service:latest
+          envFrom:
+            - secretRef:
+                name: prod-secrets
+          ports:
+            - containerPort: 4050
+          resources:
+            requests:
+              cpu: 250m
+              memory: 250Mi
+            limits:
+              cpu: 500m
+              memory: 500Mi
+---
