@@ -87,11 +87,18 @@ def validate_comp(body, spec, warnings: list[str], **_):
     if sum(temp_list) > 1:
         raise kopf.AdmissionError("is-public set to true for two deffirent ports")
 
-    # if is-public = true than, is-peered must be true as well
+    # if is-public = true, is-peered must be true too
     for exp in spec.get("expose", []):
         if exp.get("is-public") == True and exp.get("is-peered") == False:
             raise kopf.AdmissionError(
                 "is-public set to true but is-peered set to false"
+            )
+
+    # if is-exposing-metrics = true, is-peered muse be true too
+    for exp in spec.get("expose", []):
+        if exp.get("is-exposing-metrics") == True and exp.get("is-peered") == False:
+            raise kopf.AdmissionError(
+                "is-exposing-metrics set to true but is-peered set to false"
             )
 
     if "namespace" in body.get("metadata") and body.get("metadata").get(
