@@ -1,0 +1,14 @@
+apiVersion: miro.onesource.pt/v1
+kind: CustomCluster
+metadata:
+  name: docker-workload-3-cc
+spec:
+  infra-provider: docker
+  configMapRef:
+    name: docker-config
+  bootstrap-provider: kubeadm
+  flavor: development
+  name: docker-workload-3
+  kubernetes-version: "v1.25.0"
+  control-plane-count: 1
+  worker-machine-count: 1

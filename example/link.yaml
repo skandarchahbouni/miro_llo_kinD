@@ -1,0 +1,7 @@
+apiVersion: miro.onesource.pt/v1
+kind: Link
+metadata:
+  name: my-link
+spec:
+  local-cluster: docker-workload-1
+  remote-cluster: docker-workload-2
