@@ -6,6 +6,48 @@ router = APIRouter()
 log = logging.getLogger(__name__)
 
 
+@router.post("/apps", status_code=status.HTTP_201_CREATED)
+def create_app(
+    spec: dict = Body(...),
+):
+    logging.info("/apps POST")
+    return app_controller.create_app(spec=spec)
+
+
+@router.delete("/apps/{app_name}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_app(
+    app_name: str,
+    spec: dict = Body(...),
+):
+    logging.info(f"/apps/{app_name} DELETE")
+    return app_controller.delete_app(spec=spec)
+
+
+@router.put("/apps/{app_name}", status_code=status.HTTP_200_OK)
+def update_app(
+    app_name: str, spec: dict = Body(...), old: list = Body(...), new: list = Body(...)
+):
+    logging.info(f"/apps/{app_name} PUT")
+    return app_controller.update_app(spec=spec, old=old, new=new)
+
+
+@router.post("/comps", status_code=status.HTTP_201_CREATED)
+def create_comp(
+    spec: dict = Body(...),
+):
+    logging.info("/comps POST")
+    return app_controller.create_comp(spec=spec)
+
+
+@router.delete("/comps/{comp_name}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_app(
+    comp_name: str,
+    spec: dict = Body(...),
+):
+    logging.info(f"/comps/{comp_name} DELETE")
+    return app_controller.delete_comp(spec=spec)
+
+
 @router.post("/namespaces", status_code=status.HTTP_201_CREATED)
 def create_namespace(
     namespace_name: str = Body(...),

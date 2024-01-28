@@ -112,47 +112,21 @@ def validate_comp(body, spec, warnings: list[str], **_):
 
 # ---------------------------------- APPLICATION-CRD ---------------------------------- #
 @kopf.on.create("Application")
-def create_app_handler(body, **_):
+def create_app_handler(spec, **_):
     """
     This handler:
         - Creates the namespace in the application cluster.
         - Peers between the app_cluster and the component clusters if not already done.
         - Performs namespace offloading between app clusters and components clusters.
     """
-
-    try:
-        app_module = config.APPS["apps"]
-
-        # Retireving application cluster and application name from the body
-        app_cluster = body["spec"]["cluster"]
-        app_name = body["spec"]["name"]
-
-        # Create namesapce in the app_cluster
-        response = app_module.create_namespace(
-            namespace_name=app_name, app_cluster=app_cluster
-        )
-        if (response is None) or (response.status_code != status.HTTP_201_CREATED):
-            logging.error("Error: app_module.create_namespace")
-
-        # Linking between the app_cluster and the components clusters
-        components_list = body["spec"]["components"]
-
-        # Unique list of components clusters
-        components_clusters = list(set([comp["cluster"] for comp in components_list]))
-
-        # Linking & ns offloading
-        for cluster in components_clusters:
-            if cluster != app_cluster:
-                # TODO: Link the two clusters using by applying the link-crd
-                # TODO: Offload the namespace
-                pass
-
-    except Exception as _:
-        logging.error("Exception in [on.create('Application') handler]")
+    app_module = config.APPS["apps"]
+    response = app_module.create_app(spec=spec.__dict__["_src"]["spec"])
+    if response.status_code != status.HTTP_201_CREATED:
+        logging.error("Something went wrong. [create_app_handler]")
 
 
 @kopf.on.delete("Application")
-def delete_app_handler(body, **_):
+def delete_app_handler(spec, **_):
     """
     This handler:
         - Deletes all the components of an application
@@ -160,40 +134,10 @@ def delete_app_handler(body, **_):
         - Unoffload the namespace of the application.
         - Deletes the namespace of the application from the application cluster.
     """
-
-    try:
-        app_module = config.APPS["apps"]
-
-        # Retireving application cluster and application name from the body
-        app_name = body["spec"]["name"]
-        app_cluster = body["spec"]["cluster"]
-        components_list = body["spec"]["components"]
-
-        # Removing all the components of the application
-        for component in components_list:
-            # Delete the component CRD from the management cluster
-            response = app_module.delete_component(
-                component_name=component["name"], app_name=app_name
-            )
-            if (
-                (response is None)
-                or (response.status_code != status.HTTP_204_NO_CONTENT)
-                or (response.status_code != 404)
-            ):
-                logging.error("Error: app_module.delete_component")
-
-        # 2 - Unpeering and namespace un-offloading, if this will not break the current or another application
-        # TODO: .......
-
-        # 3 Deleting the namespace
-        response = app_module.delete_namespace(
-            namespace_name=app_name, app_cluster=app_cluster
-        )
-        if (response is None) or (response.status_code != status.HTTP_204_NO_CONTENT):
-            logging.error("Error: app_module.delete_namespace")
-
-    except Exception as _:
-        logging.error("Exception in [on.delete('Application') handler]")
+    app_module = config.APPS["apps"]
+    response = app_module.delete_app(spec=spec.__dict__["_src"]["spec"])
+    if response.status_code != status.HTTP_204_NO_CONTENT:
+        logging.error("Something went wrong. [delete_app_handler]")
 
 
 # Application name is immutable, so the only update that can happen to the Application crd is in the components list.
@@ -202,7 +146,7 @@ def delete_app_handler(body, **_):
 # - 02: a component was removed from the application
 # - 03: a component migrated (changed cluster)
 @kopf.on.update("Application", field="spec.components")
-def update_app_handler(body, old, new, **_):
+def update_app_handler(spec, old, new, **_):
     """
     This function:
         - Does all the peering and namespace offloading needed for the new added components to the application.
@@ -210,176 +154,36 @@ def update_app_handler(body, old, new, **_):
         - Trigger the migration of a component if a component changed the cluster.
     """
     app_module = config.APPS["apps"]
-
-    added_components, removed_components, migrated_components = app_module.get_changes(
-        old, new
+    response = app_module.update_app(
+        spec=spec.__dict__["_src"]["spec"], old=old, new=new
     )
-
-    # 1 - New components added to the application
-    # We have to do the peering and the namespace offloading if this is not already done.
-    if len(added_components):
-        # The clusters already peered:
-        peered_clusters = list(set([comp["cluster"] for comp in old]))
-        for component in added_components:
-            if component["cluster"] not in peered_clusters:
-                # TODO: do the peering and the namespace offloading
-                pass
-
-    # 2 - Some components removed from the application
-    # Here we have to delete the component, and un-offload the namespace and unpeer the clusters if this is not already done
-    for component in removed_components:
-        # Delete the component
-        response = app_module.delete_component(
-            component_name=component["name"], app_name=body["spec"]["name"]
-        )
-        if (
-            (response is None)
-            or (response.status_code != status.HTTP_204_NO_CONTENT)
-            or (response.status_code != 404)
-        ):
-            logging.error("Error: app_module.delete_component")
-
-    # TODO: unpeer and un-offload the namespace if it's not needed by the current or another application (removed component)
-
-    # 3 - Migration
-    for component in migrated_components:
-        # TODO: launch the migration of the component from the old cluster to the new cluster
-        pass
+    if response.status_code != status.HTTP_200_OK:
+        logging.error("Something went wrong. [update_app_handler]")
 
 
 # ---------------------------------- COMPONENT-CRD ---------------------------------- #
 @kopf.on.create("Component")
-def create_comp_handler(body, **_):
+def create_comp_handler(spec, **_):
     """
-    This function:
+    This handler:
         - Creates deployment, service, servicemonitor, ingress ... related to the component.
     """
-
-    try:
-        app_module = config.APPS["apps"]
-        component = body["spec"]
-        application = body["spec"]["application"]
-
-        # install the deployment
-        response = app_module.install_deployment(
-            component=component, app_name=application
-        )
-        if (response is None) or (response.status_code != status.HTTP_200_OK):
-            logging.error("Error: app_module.install_deployment")
-
-        # Installing service
-        # First, we need to filter only the ports where "is-peered" is set to True (is-peered=True)
-        peered_ports = [
-            port for port in component["expose"] if port["is-peered"] == True
-        ]
-        if len(peered_ports):
-            response = app_module.install_service(
-                component_name=component["name"],
-                app_name=component["application"],
-                ports_list=peered_ports,
-            )
-            if (response is None) or (response.status_code != status.HTTP_200_OK):
-                logging.error("Error: app_module.install_service")
-
-        # Installing ServiceMonitor
-        # First, we need to filter only the ports where "is-exposing-metrics" is set to True (is-exposing-metrics=True)
-        exposing_metrics_ports = [
-            item for item in component["expose"] if item["is-exposing-metrics"] == True
-        ]
-        if len(exposing_metrics_ports):
-            response = app_module.install_servicemonitor(
-                app_name=component["application"],
-                component_name=component["name"],
-                ports_list=exposing_metrics_ports,
-            )
-            if (response is None) or (response.status_code != status.HTTP_200_OK):
-                logging.error("Error: app_module.install_servicemonitor")
-
-        # Ingress
-        for exp in component["expose"]:
-            if exp["is-public"] == True:
-                response = app_module.add_host_to_ingress(
-                    app_name=component["application"],
-                    component_name=component["name"],
-                    port=exp["clusterPort"],
-                )
-                if (response is None) or (response.status_code != status.HTTP_200_OK):
-                    logging.error("Error: app_module.add_host_to_ingress")
-
-                # Break because is-public could be true only once. [see validation admission webhook]
-                break
-
-    except Exception as _:
-        logging.error("Exception in [on.create('Component') handler]")
+    app_module = config.APPS["apps"]
+    response = app_module.create_comp(spec=spec.__dict__["_src"]["spec"])
+    if response.status_code != status.HTTP_201_CREATED:
+        logging.error("Something went wrong. [create_comp_handler]")
 
 
 @kopf.on.delete("Component")
-def delete_comp_handler(body, **_):
+def delete_comp_handler(spec, **_):
     """
-    This function:
+    This handler:
         - Deletes deployment, service, servicemonitor, ingress ... related to the component.
     """
-
-    try:
-        component = body["spec"]
-        application = body["spec"]["application"]
-        app_module = config.APPS["apps"]
-
-        # uninstall the deployment
-        response = app_module.uninstall_deployment(
-            component_name=component["name"],
-            app_name=application,
-        )
-        if (response is None) or (response.status_code != status.HTTP_204_NO_CONTENT):
-            logging.error("Error: app_module.uninstall_deployment")
-
-        # uninstalling services, servicemonitors, ingresses ...
-        if "expose" in component and component["expose"]:
-            # Uninstall service
-            for exp in component["expose"]:
-                if exp["is-peered"] == True:
-                    response = app_module.uninstall_service(
-                        component_name=component["name"],
-                        app_name=component["application"],
-                    )
-                    if (response is None) or (
-                        response.status_code != status.HTTP_204_NO_CONTENT
-                    ):
-                        logging.error("Error: app_module.uninstall_service")
-
-                    # Break since we have only one service for each component
-                    break
-
-            # Uninstall ServiceMonitor
-            for exp in component["expose"]:
-                if exp["is-exposing-metrics"] == True:
-                    response = app_module.uninstall_servicemonitor(
-                        component_name=component["name"],
-                        app_name=component["application"],
-                    )
-                    if (response is None) or (
-                        response.status_code != status.HTTP_204_NO_CONTENT
-                    ):
-                        logging.error("Error: app_module.uninstall_servicemonitor")
-
-                    # Break since we have only one ServiceMonitor for each component
-                    break
-
-            # Ingress
-            for exp in component["expose"]:
-                if exp["is-public"] == True:
-                    response = app_module.remove_host_from_ingress(
-                        app_name=component["application"],
-                        component_name=component["name"],
-                    )
-                    if (response is None) or (
-                        response.status_code != status.HTTP_200_OK
-                    ):
-                        logging.error("Error: app_module.remove_host_from_ingress")
-                    break
-
-    except Exception as _:
-        logging.error("Exception in [on.delete('Component') handler]")
+    app_module = config.APPS["apps"]
+    response = app_module.delete_comp(spec=spec.__dict__["_src"]["spec"])
+    if response.status_code != status.HTTP_204_NO_CONTENT:
+        logging.error("Something went wrong. [delete_comp_handler]")
 
 
 # Note that this handler doesn't handle the update of "expose", "tls" fields. They are handled seperately

@@ -9,8 +9,8 @@ spec:
   name: python-component
   # replicas: 1
   expose:
-    - is-public: false
-      is-peered: false
+    - is-public: true
+      is-peered: true
       is-exposing-metrics: true
       containerPort: 5000
       clusterPort: 80

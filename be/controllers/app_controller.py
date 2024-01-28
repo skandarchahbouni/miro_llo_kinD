@@ -7,10 +7,161 @@ import yaml
 import os
 import logging
 
-
 group = os.environ.get("CRD_GROUP")
 version = os.environ.get("CRD_VERSION")
 TEMPLATE_DIR = os.environ.get("TEMPLATE_DIR")
+
+
+# ------------------------------------------------------------ #
+def create_app(spec: dict):
+    # Retireving application cluster and application name from the body
+    app_cluster = spec["cluster"]
+    app_name = spec["name"]
+
+    # Create namesapce in the app_cluster
+    create_namespace(namespace_name=app_name, app_cluster=app_cluster)
+
+    # Linking between the app_cluster and the components clusters
+    components_list = spec["components"]
+
+    # Unique list of components clusters
+    components_clusters = list(set([comp["cluster"] for comp in components_list]))
+
+    # Linking & ns offloading
+    for cluster in components_clusters:
+        if cluster != app_cluster:
+            # TODO: Link the two clusters using by applying the link-crd
+            # TODO: Offload the namespace
+            pass
+
+
+def delete_app(spec: dict):
+    # Retireving application cluster and application name from the body
+    app_name = spec["name"]
+    app_cluster = spec["cluster"]
+    components_list = spec["components"]
+
+    print(components_list)
+    # Removing all the components of the application
+    for component in components_list:
+        # Delete the component CRD from the management cluster
+        delete_component(component_name=component["name"], app_name=app_name)
+
+    # 2 - Unpeering and namespace un-offloading, if this will not break the current or another application
+    # TODO: .......
+
+    # 3 Deleting the namespace
+    delete_namespace(namespace_name=app_name, app_cluster=app_cluster)
+
+
+def update_app(spec: dict, old: list, new: list):
+    added_components, removed_components, migrated_components = get_changes(old, new)
+
+    # 1 - New components added to the application
+    # We have to do the peering and the namespace offloading if this is not already done.
+    if len(added_components):
+        # The clusters already peered:
+        peered_clusters = list(set([comp["cluster"] for comp in old]))
+        for component in added_components:
+            if component["cluster"] not in peered_clusters:
+                # TODO: do the peering and the namespace offloading
+                pass
+
+    # 2 - Some components removed from the application
+    # Here we have to delete the component, and un-offload the namespace and unpeer the clusters if this is not already done
+    for component in removed_components:
+        # Delete the component
+        delete_component(component_name=component["name"], app_name=spec["name"])
+
+    # TODO: unpeer and un-offload the namespace if it's not needed by the current or another application (removed component)
+
+    # 3 - Migration
+    for component in migrated_components:
+        # TODO: launch the migration of the component from the old cluster to the new cluster
+        pass
+
+
+def create_comp(spec: dict):
+    application = spec["application"]
+    # install the deployment
+    install_deployment(component=spec, app_name=application)
+
+    # Installing service
+    # First, we need to filter only the ports where "is-peered" is set to True (is-peered=True)
+    peered_ports = [port for port in spec["expose"] if port["is-peered"] == True]
+    if len(peered_ports):
+        install_service(
+            component_name=spec["name"],
+            app_name=spec["application"],
+            ports_list=peered_ports,
+        )
+
+    # Installing ServiceMonitor
+    # First, we need to filter only the ports where "is-exposing-metrics" is set to True (is-exposing-metrics=True)
+    exposing_metrics_ports = [
+        item for item in spec["expose"] if item["is-exposing-metrics"] == True
+    ]
+    if len(exposing_metrics_ports):
+        install_servicemonitor(
+            app_name=spec["application"],
+            component_name=spec["name"],
+            ports_list=exposing_metrics_ports,
+        )
+
+    # Ingress
+    for exp in spec["expose"]:
+        if exp["is-public"] == True:
+            add_host_to_ingress(
+                app_name=spec["application"],
+                component_name=spec["name"],
+                port=exp["clusterPort"],
+            )
+
+            # Break because is-public could be true only once. [see validation admission webhook]
+            break
+
+
+def delete_comp(spec):
+    application = spec["application"]
+    # uninstall the deployment
+    uninstall_deployment(
+        component_name=spec["name"],
+        app_name=application,
+    )
+
+    # uninstalling services, servicemonitors, ingresses ...
+    if "expose" in spec and spec["expose"]:
+        # Uninstall service
+        for exp in spec["expose"]:
+            if exp["is-peered"] == True:
+                uninstall_service(
+                    component_name=spec["name"],
+                    app_name=spec["application"],
+                )
+                # Break since we have only one service for each component
+                break
+
+        # Uninstall ServiceMonitor
+        for exp in spec["expose"]:
+            if exp["is-exposing-metrics"] == True:
+                uninstall_servicemonitor(
+                    component_name=spec["name"],
+                    app_name=spec["application"],
+                )
+                # Break since we have only one ServiceMonitor for each component
+                break
+
+        # Ingress
+        for exp in spec["expose"]:
+            if exp["is-public"] == True:
+                remove_host_from_ingress(
+                    app_name=spec["application"],
+                    component_name=spec["name"],
+                )
+                break
+
+
+# ---------------------------------- #
 
 
 def create_namespace(namespace_name: str, app_cluster: str):
@@ -32,10 +183,10 @@ def create_namespace(namespace_name: str, app_cluster: str):
         api_instance.create_namespace(body=new_namespace)
         logging.info(f"Namespace {namespace_name} created successfully!.")
     except ConfigException as _:
-        logging.error(f"Error: load_kube_config [app_controller.create_namespace]")
+        logging.error("Error: load_kube_config [create_namespace]")
         raise HTTPException(status_code=500)
     except ApiException as e:
-        logging.error("Error: app_controller.create_namespace.")
+        logging.error("Error: [create_namespace function].")
         raise HTTPException(status_code=e.status)
 
 
@@ -63,7 +214,7 @@ def delete_namespace(namespace_name: str, app_cluster: str):
         raise HTTPException(status_code=e.status)
 
 
-def install_deployment(component: dict, app_name: str, update: bool):
+def install_deployment(component: dict, app_name: str, update: bool = False):
     # Get the app instance of the component
     app_cluster, comp_cluster = _get_app_and_comp_cluster(
         app_name=app_name, component_name=component["name"]
@@ -152,7 +303,7 @@ def install_service(
     component_name: str,
     app_name: str,
     ports_list: list,
-    update: bool,
+    update: bool = False,
 ):
     # Get the app instance of the component
     app_cluster, _ = _get_app_and_comp_cluster(
@@ -228,7 +379,7 @@ def install_servicemonitor(
     app_name: str,
     component_name: str,
     ports_list: list,
-    update: bool,
+    update: bool = False,
 ):
     # Get the app instance of the component
     app_cluster, _ = _get_app_and_comp_cluster(
@@ -343,8 +494,11 @@ def delete_component(component_name: str, app_name: str):
         logging.error("Error: load_kube_config [app_controller.delete_component]")
         raise HTTPException(status_code=500)
     except ApiException as e:
-        logging.error("Error: app_controller.delete_component")
-        raise HTTPException(status_code=e.status)
+        if e.status == 404:
+            logging.info("Component doesn't exist.")
+        else:
+            logging.error("Exception: [delete_component function]")
+            raise HTTPException(status_code=e.status)
 
 
 def add_host_to_ingress(app_name: str, component_name: str, port: int):
@@ -558,3 +712,34 @@ def _get_existing_hosts(app_cluster_context: str, app_name: str):
         raise HTTPException(status_code=500)
     except ApiException as e:
         raise e
+
+
+def get_changes(old: dict | None, new: dict | None) -> tuple[list, list, list]:
+    """
+    This function compares between the old and new dict and returns the changes detected, which could be:
+        - New components added to the application.
+        - Some components Deleted from the application.
+        - Some components changed the cluster (migration).
+    """
+    logging.info("get_changes function is called.")
+    # All the components were added
+    if old is None:
+        return new, [], []
+
+    # All the components were removed
+    if new is None:
+        return [], old, []
+
+    added_components = [obj for obj in new if obj not in old]
+    removed_components = [obj for obj in old if obj not in new]
+
+    old_dict = {obj["name"]: obj["cluster"] for obj in old}
+    new_dict = {obj["name"]: obj["cluster"] for obj in new}
+
+    migrated_components = [
+        {"name": name, "old_cluster": old_dict[name], "new_cluster": new_dict[name]}
+        for name in set(old_dict) & set(new_dict)
+        if old_dict[name] != new_dict[name]
+    ]
+
+    return added_components, removed_components, migrated_components

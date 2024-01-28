@@ -7,7 +7,7 @@ spec:
   name: test-app
   cluster: kind-workload-2
   components:
-    - name: nginx-component
-      cluster: kind-workload-2
     - name: python-component
+      cluster: kind-workload-2
+    - name: nginx-component
       cluster: kind-workload-2
