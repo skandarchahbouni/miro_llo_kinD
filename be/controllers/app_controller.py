@@ -161,6 +161,113 @@ def delete_comp(spec):
                 break
 
 
+def update_comp_deployment(spec: dict):
+    application = spec["application"]
+    # Re-apply the deployment
+    install_deployment(component=spec, app_name=application, update=True)
+
+
+def update_comp_expose_field(spec: dict, old: list, new: list):
+    component_name = spec["name"]
+    application = spec["application"]
+    # ------------- UPDATE SERVICE -------------#
+    # filter only the ports where "is-peered" is set to True (is-peered=True)
+    peered_ports = [port for port in new if port["is-peered"] == True]
+    old_peered_ports = [port for port in old if port["is-peered"] == True]
+    if len(peered_ports):
+        if len(old_peered_ports):
+            update = True
+        else:
+            update = False
+        install_service(
+            component_name=component_name,
+            app_name=application,
+            ports_list=peered_ports,
+            update=update,
+        )
+
+    else:
+        # len(peered_ports) = 0 => no port is peered => DELETE the service if it was existing before.
+        # Check whether the service was created before
+        if len(old_peered_ports):
+            # Delete the service
+            uninstall_service(
+                component_name=component_name,
+                app_name=application,
+            )
+
+    # ------------- UPDATE SERVICEMONITOR -------------#
+    # Exactly the same logic as above with "Service"
+    exposing_metrics_ports = [
+        port for port in new if port["is-exposing-metrics"] == True
+    ]
+    old_exposing_metrics_ports = [
+        port for port in old if port["is-exposing-metrics"] == True
+    ]
+    if len(exposing_metrics_ports):
+        if len(old_exposing_metrics_ports):
+            update = True
+        else:
+            update = False
+        # Re-aplly the ServiceMonitor
+        install_servicemonitor(
+            app_name=application,
+            component_name=component_name,
+            ports_list=exposing_metrics_ports,
+            update=update,
+        )
+
+    else:
+        if len(old_exposing_metrics_ports):
+            # Delete the ServiceMonitor
+            uninstall_servicemonitor(
+                component_name=component_name,
+                app_name=application,
+            )
+
+    # ------------- UPDATE INGRESS -------------#
+
+    # maximum length of this list is 1
+    new_public_port = None
+    for port in new:
+        if port["is-public"] == True:
+            new_public_port = port
+            break
+
+    old_public_port = None
+    for port in old:
+        if port["is-public"] == True:
+            old_public_port = port
+            break
+
+    # The component was not public, and updated to be public
+    if new_public_port is not None and old_public_port is None:
+        add_host_to_ingress(
+            app_name=application,
+            component_name=component_name,
+            port=new_public_port["clusterPort"],
+        )
+
+    # The component was public, and updated to be not public
+    if new_public_port is None and old_public_port is not None:
+        remove_host_from_ingress(
+            app_name=application,
+            component_name=component_name,
+        )
+
+    # The port updated
+    if (
+        new_public_port is not None
+        and old_public_port is not None
+        and new_public_port["clusterPort"] != old_public_port["clusterPort"]
+    ):
+        update_host_in_ingress(
+            app_name=application,
+            component_name=component_name,
+            new_port=new_public_port["clusterPort"],
+        )
+
+
 # ---------------------------------- #
 
 

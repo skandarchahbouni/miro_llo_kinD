@@ -6,7 +6,7 @@ metadata:
 spec:
   application: test-app
   # 1.21.5
-  image: nginx:latest
+  image: nginx:1.21.5
   name: nginx-component
   # replicas: 1
   expose:
@@ -14,4 +14,4 @@ spec:
       is-peered: true
       is-exposing-metrics: false
       containerPort: 80
-      clusterPort: 3000
+      clusterPort: 4000

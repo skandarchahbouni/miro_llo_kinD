@@ -188,159 +188,29 @@ def delete_comp_handler(spec, **_):
 
 # Note that this handler doesn't handle the update of "expose", "tls" fields. They are handled seperately
 @kopf.on.update("Component", field="spec")
-def update_comp_handler_deployment(body, **_):
+def update_comp_handler_deployment(spec, **_):
     """
     - This function:
         - update the deployment related to the component.
     """
     # It will return "unchanged" if the deployment didn't change.
-    try:
-        app_module = config.APPS["apps"]
-        component = body["spec"]
-        application = body["spec"]["application"]
-
-        # Re-apply the deployment
-        response = app_module.install_deployment(
-            component=component, app_name=application, update=True
-        )
-        if (response is None) or (response.status_code != status.HTTP_200_OK):
-            logging.error("Error: app_module.install_deployment")
-
-    except Exception as _:
-        logging.error(
-            "Exception in [on.update('Component') handler: [update_comp_handler_deployment] function.]"
-        )
+    app_module = config.APPS["apps"]
+    response = app_module.update_comp_deployment(spec=spec.__dict__["_src"]["spec"])
+    if response.status_code != status.HTTP_200_OK:
+        logging.error("Something went wrong. [update_comp_handler_deployment]")
 
 
 # Handler for the expose field
 @kopf.on.update("Component", field="spec.expose")
-def update_comp_handler_expose_field(body, old, new, **_):
+def update_comp_handler_expose_field(spec, old, new, **_):
     """
     - This function:
         - update the service, ingress, ServiceMonitor, By regenerating the yaml files and applying them again.
         - Delete the service, ingress, srvicemonitor if there is no longer need for them.
     """
-
-    try:
-        app_module = config.APPS["apps"]
-        component_name = body["spec"]["name"]
-        application = body["spec"]["application"]
-        # ------------- UPDATE SERVICE -------------#
-        # filter only the ports where "is-peered" is set to True (is-peered=True)
-        peered_ports = [port for port in new if port["is-peered"] == True]
-        old_peered_ports = [port for port in old if port["is-peered"] == True]
-        if len(peered_ports):
-            if len(old_peered_ports):
-                update = True
-            else:
-                update = False
-            response = app_module.install_service(
-                component_name=component_name,
-                app_name=application,
-                ports_list=peered_ports,
-                update=update,
-            )
-            if (response is None) or (response.status_code != status.HTTP_200_OK):
-                logging.error("Error: app_module.install_service")
-
-        else:
-            # len(peered_ports) = 0 => no port is peered => DELETE the service if it was existing before.
-            # Check whether the service was created before
-            if len(old_peered_ports):
-                # Delete the service
-                response = app_module.uninstall_service(
-                    component_name=component_name,
-                    app_name=application,
-                )
-                if (response is None) or (
-                    response.status_code != status.HTTP_204_NO_CONTENT
-                ):
-                    logging.error("Error: app_module.uninstall_service")
-
-        # ------------- UPDATE SERVICEMONITOR -------------#
-        # Exactly the same logic as above with "Service"
-        exposing_metrics_ports = [
-            port for port in new if port["is-exposing-metrics"] == True
-        ]
-        old_exposing_metrics_ports = [
-            port for port in old if port["is-exposing-metrics"] == True
-        ]
-        if len(exposing_metrics_ports):
-            if len(old_exposing_metrics_ports):
-                update = True
-            else:
-                update = False
-            # Re-aplly the ServiceMonitor
-            response = app_module.install_servicemonitor(
-                app_name=application,
-                component_name=component_name,
-                ports_list=exposing_metrics_ports,
-                update=update,
-            )
-            if (response is None) or (response.status_code != status.HTTP_200_OK):
-                logging.error("Error: app_module.install_servicemonitor")
-
-        else:
-            if len(old_exposing_metrics_ports):
-                # Delete the ServiceMonitor
-                response = app_module.uninstall_servicemonitor(
-                    component_name=component_name,
-                    app_name=application,
-                )
-                if (response is None) or (
-                    response.status_code != status.HTTP_204_NO_CONTENT
-                ):
-                    logging.error("Error: app_module.uninstall_servicemonitor")
-
-        # ------------- UPDATE INGRESS -------------#
-
-        # maximum length of this list is 1
-        new_public_port = None
-        for port in new:
-            if port["is-public"] == True:
-                new_public_port = port
-                break
-
-        old_public_port = None
-        for port in old:
-            if port["is-public"] == True:
-                old_public_port = port
-                break
-
-        # The component was not public, and updated to be public
-        if new_public_port is not None and old_public_port is None:
-            response = app_module.add_host_to_ingress(
-                app_name=application,
-                component_name=component_name,
-                port=new_public_port["clusterPort"],
-            )
-            if response is None or response.status_code != status.HTTP_200_OK:
-                logging.error("ERROR: app_module.add_host_to_ingress")
-
-        # The component was public, and updated to be not public
-        if new_public_port is None and old_public_port is not None:
-            response = app_module.remove_host_from_ingress(
-                app_name=application,
-                component_name=component_name,
-            )
-            if response is None or response.status_code != status.HTTP_200_OK:
-                logging.error("ERROR: app_module.remove_host_from_ingress")
-
-        # The port updated
-        if (
-            new_public_port is not None
-            and old_public_port is not None
-            and new_public_port["clusterPort"] != old_public_port["clusterPort"]
-        ):
-            response = app_module.update_host_in_ingress(
-                app_name=application,
-                component_name=component_name,
-                new_port=new_public_port["clusterPort"],
-            )
-            if response is None or response.status_code != status.HTTP_200_OK:
-                logging.error("ERROR: app_module.update_host_in_ingress")
-
-    except Exception as _:
-        logging.error(
-            "Exception in [on.update('Component') handler: [update_comp_handler_expose_field] function.]"
-        )
+    app_module = config.APPS["apps"]
+    response = app_module.update_comp_expose_field(
+        spec=spec.__dict__["_src"]["spec"], old=old, new=new
+    )
+    if response.status_code != status.HTTP_200_OK:
+        logging.error("Something went wrong. [update_comp_handler_expose_field]")

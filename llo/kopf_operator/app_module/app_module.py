@@ -92,6 +92,44 @@ def delete_comp(spec: dict) -> requests.Response | None:
     return None
 
 
+def update_comp_deployment(spec: dict) -> requests.Response | None:
+    logging.info("update_comp_deployment function is called.")
+    url = API_URL + f"/comps/{spec['name']}/deployment"
+    try:
+        response = requests.put(url=url, json=spec)
+        return response
+    except requests.exceptions.ConnectionError:
+        logging.error("A connection error occurred. [update_comp_deployment function]")
+    except requests.exceptions.Timeout:
+        logging.error("The request timed out. [update_comp_deployment function]")
+    except requests.exceptions.HTTPError as _:
+        logging.error("HTTP Error. [update_comp_deployment function]")
+    except requests.exceptions.RequestException as _:
+        logging.error("An error occurred. [update_comp_deployment function]")
+    return None
+
+
+def update_comp_expose_field(
+    spec: dict, old: list, new: list
+) -> requests.Response | None:
+    logging.info("update_comp_deployment function is called.")
+    url = API_URL + f"/comps/{spec['name']}/expose"
+    try:
+        response = requests.put(url=url, json={"spec": spec, "old": old, "new": new})
+        return response
+    except requests.exceptions.ConnectionError:
+        logging.error(
+            "A connection error occurred. [update_comp_expose_field function]"
+        )
+    except requests.exceptions.Timeout:
+        logging.error("The request timed out. [update_comp_expose_field function]")
+    except requests.exceptions.HTTPError as _:
+        logging.error("HTTP Error. [update_comp_expose_field function]")
+    except requests.exceptions.RequestException as _:
+        logging.error("An error occurred. [update_comp_expose_field function]")
+    return None
+
+
 # ---------------------------------- Functions Needed by the 'application-crd' Operator ---------------------------------- #
 def create_namespace(namespace_name: str, app_cluster: str) -> requests.Response | None:
     """

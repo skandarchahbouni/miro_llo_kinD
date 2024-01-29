@@ -12,5 +12,5 @@ spec:
     - is-public: true
       is-peered: true
       is-exposing-metrics: true
-      containerPort: 5000
-      clusterPort: 80
+      containerPort: 80
+      clusterPort: 5000

@@ -48,6 +48,20 @@ def delete_app(
     return app_controller.delete_comp(spec=spec)
 
 
+@router.put("/comps/{comp_name}/deployment", status_code=status.HTTP_200_OK)
+def update_app_deployment(comp_name: str, spec: dict = Body(...)):
+    logging.info(f"/comps/{comp_name}/deployment PUT")
+    return app_controller.update_comp_deployment(spec=spec)
+
+
+@router.put("/comps/{comp_name}/expose", status_code=status.HTTP_200_OK)
+def update_comp_expose_field(
+    comp_name: str, spec: dict = Body(...), old: list = Body(...), new: list = Body(...)
+):
+    logging.info(f"/comps/{comp_name}/expose PUT")
+    return app_controller.update_comp_expose_field(spec=spec, old=old, new=new)
+
+
 @router.post("/namespaces", status_code=status.HTTP_201_CREATED)
 def create_namespace(
     namespace_name: str = Body(...),
