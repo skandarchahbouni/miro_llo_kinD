@@ -6,7 +6,6 @@ from fastapi import HTTPException
 import yaml
 import os
 import logging
-import time
 
 
 group = os.environ.get("CRD_GROUP")
@@ -14,10 +13,9 @@ version = os.environ.get("CRD_VERSION")
 TEMPLATE_DIR = os.environ.get("TEMPLATE_DIR")
 
 
-def create_namespace(namespace_name: str, app_cluster: str):
+def create_namespace(namespace_name: str, app_cluster_context: str):
     try:
         # Create namespace in the app cluster
-        app_cluster_context = _get_context(cluster=app_cluster)
         config.load_kube_config(context=app_cluster_context)
         api_instance = client.CoreV1Api()
         new_namespace = client.V1Namespace(
@@ -40,7 +38,7 @@ def create_namespace(namespace_name: str, app_cluster: str):
         raise HTTPException(status_code=e.status)
 
 
-def delete_namespace(namespace_name: str, app_cluster: str):
+def delete_namespace(namespace_name: str, app_cluster_context: str):
     try:
         # Delete namespace in the management-cluster
         config.load_kube_config()
@@ -49,7 +47,6 @@ def delete_namespace(namespace_name: str, app_cluster: str):
             name=namespace_name, body=client.V1DeleteOptions()
         )
         # Delete namespace in the app_cluster
-        app_cluster_context = _get_context(cluster=app_cluster)
         config.load_kube_config(context=app_cluster_context)
         api_instance = client.CoreV1Api()
         api_instance.delete_namespace(
@@ -64,17 +61,7 @@ def delete_namespace(namespace_name: str, app_cluster: str):
         raise HTTPException(status_code=e.status)
 
 
-def install_deployment(component: dict, app_name: str, update: bool = False):
-    # Get the app instance of the component
-    app_cluster, comp_cluster = _get_app_and_comp_cluster(
-        app_name=app_name, component_name=component["name"]
-    )
-    if comp_cluster != app_cluster:
-        component["cluster-selector"] = comp_cluster
-
-    # get the app_cluster context
-    app_cluster_context = _get_context(cluster=app_cluster)
-
+def install_deployment(component: dict, app_cluster_context: str, update: bool = False):
     # Loading the template
     try:
         environment = Environment(loader=FileSystemLoader(TEMPLATE_DIR))
@@ -124,14 +111,7 @@ def install_deployment(component: dict, app_name: str, update: bool = False):
         raise HTTPException(e.status)
 
 
-def uninstall_deployment(component_name: str, app_name: str):
-    # Get the app instance of the component
-    app_cluster, _ = _get_app_and_comp_cluster(
-        app_name=app_name, component_name=component_name
-    )
-    # get the app_cluster context
-    app_cluster_context = _get_context(cluster=app_cluster)
-
+def uninstall_deployment(component_name: str, app_name: str, app_cluster_context: str):
     try:
         config.load_kube_config(context=app_cluster_context)
         api_instance = client.AppsV1Api()
@@ -150,17 +130,10 @@ def uninstall_deployment(component_name: str, app_name: str):
 def install_service(
     component_name: str,
     app_name: str,
+    app_cluster_context: str,
     ports_list: list,
     update: bool = False,
 ):
-    # Get the app instance of the component
-    app_cluster, _ = _get_app_and_comp_cluster(
-        app_name=app_name, component_name=component_name
-    )
-
-    # get the app_cluster context
-    app_cluster_context = _get_context(cluster=app_cluster)
-
     # Loading the template
     try:
         # Get template
@@ -199,14 +172,7 @@ def install_service(
         raise HTTPException(status_code=e.status)
 
 
-def uninstall_service(component_name: str, app_name: str):
-    # Get the app instance of the component
-    app_cluster, _ = _get_app_and_comp_cluster(
-        app_name=app_name, component_name=component_name
-    )
-    # get the app_cluster context
-    app_cluster_context = _get_context(cluster=app_cluster)
-
+def uninstall_service(component_name: str, app_name: str, app_cluster_context: str):
     try:
         config.load_kube_config(context=app_cluster_context)
         api_instance = client.CoreV1Api()
@@ -223,17 +189,11 @@ def uninstall_service(component_name: str, app_name: str):
 # Still other apps to be implemented
 def install_servicemonitor(
     app_name: str,
+    app_cluster_context: str,
     component_name: str,
     ports_list: list,
     update: bool = False,
 ):
-    # Get the app instance of the component
-    app_cluster, _ = _get_app_and_comp_cluster(
-        app_name=app_name, component_name=component_name
-    )
-    # get the app_cluster context
-    app_cluster_context = _get_context(cluster=app_cluster)
-
     # Get the ServiceMonitor template
     try:
         environment = Environment(loader=FileSystemLoader(TEMPLATE_DIR))
@@ -294,14 +254,9 @@ def install_servicemonitor(
         raise HTTPException(status_code=e.status)
 
 
-def uninstall_servicemonitor(component_name: str, app_name: str):
-    # Get the app instance of the component
-    app_cluster, _ = _get_app_and_comp_cluster(
-        app_name=app_name, component_name=component_name
-    )
-    # get the app_cluster context
-    app_cluster_context = _get_context(cluster=app_cluster)
-
+def uninstall_servicemonitor(
+    component_name: str, app_name: str, app_cluster_context: str
+):
     try:
         config.load_kube_config(context=app_cluster_context)
         api_instance = client.CustomObjectsApi()
@@ -345,14 +300,9 @@ def delete_component(component_name: str, app_name: str):
             raise HTTPException(status_code=e.status)
 
 
-def add_host_to_ingress(app_name: str, component_name: str, port: int):
-    # Get the app instance of the component
-    app_cluster, _ = _get_app_and_comp_cluster(
-        app_name=app_name, component_name=component_name
-    )
-    # get the app_cluster context
-    app_cluster_context = _get_context(cluster=app_cluster)
-
+def add_host_to_ingress(
+    app_name: str, app_cluster_context: str, component_name: str, port: int
+):
     # Getting the ingress of the application if it exists
     ingress_exist = True
     try:
@@ -398,14 +348,9 @@ def add_host_to_ingress(app_name: str, component_name: str, port: int):
         raise HTTPException(status_code=e.status)
 
 
-def remove_host_from_ingress(component_name: str, app_name: str):
-    # Get the app instance of the component
-    app_cluster, _ = _get_app_and_comp_cluster(
-        app_name=app_name, component_name=component_name
-    )
-    # get the app_cluster context
-    app_cluster_context = _get_context(cluster=app_cluster)
-
+def remove_host_from_ingress(
+    component_name: str, app_name: str, app_cluster_context: str
+):
     try:
         hosts = _get_existing_hosts(
             app_cluster_context=app_cluster_context, app_name=app_name
@@ -444,14 +389,9 @@ def remove_host_from_ingress(component_name: str, app_name: str):
         raise HTTPException(status_code=500)
 
 
-def update_host_in_ingress(component_name: str, app_name: str, new_port: int):
-    # Get the app instance of the component
-    app_cluster, _ = _get_app_and_comp_cluster(
-        app_name=app_name, component_name=component_name
-    )
-    # get the app_cluster context
-    app_cluster_context = _get_context(cluster=app_cluster)
-
+def update_host_in_ingress(
+    component_name: str, app_name: str, app_cluster_context: str, new_port: int
+):
     try:
         hosts = _get_existing_hosts(
             app_cluster_context=app_cluster_context, app_name=app_name
@@ -521,10 +461,10 @@ def _get_app_and_comp_cluster(
                 break
         return app_cluster, comp_cluster
     except ConfigException as _:
-        logging.error("Error: load_kube_config [get_app_instance]")
+        logging.error("Error: load_kube_config [_get_app_and_comp_cluster]")
         raise HTTPException(status_code=500)
     except ApiException as e:
-        logging.error("Error: get_app_instance")
+        logging.error("Error: _get_app_and_comp_cluster")
         raise HTTPException(status_code=e.status)
 
 
@@ -580,98 +520,3 @@ def get_changes(old: dict | None, new: dict | None) -> tuple[list, list, list]:
     ]
 
     return added_components, removed_components, migrated_components
-
-
-# -------------------------------- TESTS
-def uninstall_deployment_2(component_name: str, app_name: str):
-    app_cluster_context = "kind-workload-2"
-    try:
-        config.load_kube_config(context=app_cluster_context)
-        api_instance = client.AppsV1Api()
-        api_instance.delete_namespaced_deployment(
-            name=component_name, namespace=app_name
-        )
-        logging.info("Deployment uninstalled successfully!")
-    except ConfigException as _:
-        logging.error("Error: load_kube_config [uninstall_deployment]")
-        raise HTTPException(status_code=500)
-    except ApiException as e:
-        logging.error("Error: uninstall_deployment")
-        raise HTTPException(status_code=e.status)
-
-
-def uninstall_service_2(component_name: str, app_name: str):
-    app_cluster_context = "kind-workload-2"
-
-    try:
-        config.load_kube_config(context=app_cluster_context)
-        api_instance = client.CoreV1Api()
-        api_instance.delete_namespaced_service(name=component_name, namespace=app_name)
-        logging.info("Service uninstalled successfully!")
-    except ConfigException as _:
-        logging.error("Error: load_kube_config [uninstall_service]")
-        raise HTTPException(status_code=500)
-    except ApiException as e:
-        logging.error("Error: uninstall_service")
-        raise HTTPException(status_code=e.status)
-
-
-def uninstall_servicemonitor_2(component_name: str, app_name: str):
-    app_cluster_context = "kind-workload-2"
-    try:
-        config.load_kube_config(context=app_cluster_context)
-        api_instance = client.CustomObjectsApi()
-        api_instance.delete_namespaced_custom_object(
-            group="monitoring.coreos.com",
-            version="v1",
-            namespace=app_name,
-            name=component_name,
-            plural="servicemonitors",
-            body=client.V1DeleteOptions(),
-        )
-    except ConfigException as _:
-        logging.error("Error: load_kube_config [install_servicemonitor]")
-        raise HTTPException(status_code=500)
-    except ApiException as e:
-        logging.error("Error: install_servicemonitor")
-        raise HTTPException(status_code=e.status)
-
-
-def remove_host_from_ingress_2(component_name: str, app_name: str):
-    app_cluster_context = "kind-workload-2"
-    try:
-        hosts = _get_existing_hosts(
-            app_cluster_context=app_cluster_context, app_name=app_name
-        )
-        hosts_list = [
-            host for host in hosts if host["component_name"] != component_name
-        ]
-
-        # Updating or Deleting the ingress
-        config.load_kube_config(context=app_cluster_context)
-        api_instance = client.NetworkingV1Api()
-        if len(hosts_list) == 0:
-            # Remove the ingress
-            api_instance.delete_namespaced_ingress(
-                name=f"{app_name}-ingress", namespace=app_name
-            )
-            logging.info("ingress deleted successfully")
-        else:
-            environment = Environment(loader=FileSystemLoader(TEMPLATE_DIR))
-            ingress_template = environment.get_template("ingress_template.yaml")
-            rendered_ingress = ingress_template.render(
-                app_name=app_name,
-                component_name=component_name,
-                hosts=hosts_list,
-            )
-            yaml_output = yaml.safe_load(rendered_ingress)
-            api_instance.replace_namespaced_ingress(
-                name=f"{app_name}-ingress", namespace=app_name, body=yaml_output
-            )
-    except ConfigException as _:
-        logging.error("Error: load_kube_config [remove_host_from_ingress]")
-        raise HTTPException(status_code=500)
-    except ApiException as e:
-        raise HTTPException(status_code=e.status)
-    except Exception as _:
-        raise HTTPException(status_code=500)

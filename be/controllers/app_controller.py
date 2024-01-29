@@ -9,18 +9,13 @@ from controllers.helpers.functions import (
     install_service,
     install_servicemonitor,
     remove_host_from_ingress,
-    remove_host_from_ingress_2,
     uninstall_deployment,
-    uninstall_deployment_2,
     uninstall_service,
-    uninstall_service_2,
     uninstall_servicemonitor,
-    uninstall_servicemonitor_2,
     update_host_in_ingress,
+    _get_context,
 )
 import os
-import time
-
 
 group = os.environ.get("CRD_GROUP")
 version = os.environ.get("CRD_VERSION")
@@ -33,8 +28,10 @@ def create_app(spec: dict):
     app_cluster = spec["cluster"]
     app_name = spec["name"]
 
+    # Get the context of the app_cluster
+    app_cluster_context = _get_context(cluster=app_cluster)
     # Create namesapce in the app_cluster
-    create_namespace(namespace_name=app_name, app_cluster=app_cluster)
+    create_namespace(namespace_name=app_name, app_cluster_context=app_cluster_context)
 
     # Linking between the app_cluster and the components clusters
     components_list = spec["components"]
@@ -51,15 +48,19 @@ def create_app(spec: dict):
 
 
 def delete_app(spec: dict):
-    # 1 - Retireving application cluster and application name from the body
+    # Retireving application cluster and application name from the body
     app_name = spec["name"]
     app_cluster = spec["cluster"]
+
     for component in spec["components"]:
         # Delete the component CRD from the management cluster
         delete_component(component_name=component["name"], app_name=app_name)
     # TODO: .......
-    # 3 Deleting the namespace
-    delete_namespace(namespace_name=app_name, app_cluster=app_cluster)
+    # Deleting the namespace
+
+    # Get the context of the app_cluster
+    app_cluster_context = _get_context(cluster=app_cluster)
+    delete_namespace(namespace_name=app_name, app_cluster_context=app_cluster_context)
 
 
 def update_app(spec: dict, old: list, new: list):
@@ -91,9 +92,14 @@ def update_app(spec: dict, old: list, new: list):
 
 # ------------------------------------------------------------ #
 def create_comp(spec: dict):
+    # get context
+    app_cluster, _ = _get_app_and_comp_cluster(
+        app_name=spec["application"], component_name=spec["name"]
+    )
+    app_cluster_context = _get_context(cluster=app_cluster)
     application = spec["application"]
     # install the deployment
-    install_deployment(component=spec, app_name=application)
+    install_deployment(component=spec, app_cluster_context=app_cluster_context)
 
     # Installing service
     # First, we need to filter only the ports where "is-peered" is set to True (is-peered=True)
@@ -102,6 +108,7 @@ def create_comp(spec: dict):
         install_service(
             component_name=spec["name"],
             app_name=spec["application"],
+            app_cluster_context=app_cluster_context,
             ports_list=peered_ports,
         )
 
@@ -113,6 +120,7 @@ def create_comp(spec: dict):
     if len(exposing_metrics_ports):
         install_servicemonitor(
             app_name=spec["application"],
+            app_cluster_context=app_cluster_context,
             component_name=spec["name"],
             ports_list=exposing_metrics_ports,
         )
@@ -122,6 +130,7 @@ def create_comp(spec: dict):
         if exp["is-public"] == True:
             add_host_to_ingress(
                 app_name=spec["application"],
+                app_cluster_context=app_cluster_context,
                 component_name=spec["name"],
                 port=exp["clusterPort"],
             )
@@ -131,12 +140,19 @@ def create_comp(spec: dict):
 
 
 def delete_comp(spec):
-    _get_app_and_comp_cluster(app_name=spec["application"], component_name=spec["name"])
+    # get context
+    app_cluster, _ = _get_app_and_comp_cluster(
+        app_name=spec["application"], component_name=spec["name"]
+    )
+    app_cluster_context = _get_context(cluster=app_cluster)
+
+    #
     application = spec["application"]
     # uninstall the deployment
-    uninstall_deployment_2(
+    uninstall_deployment(
         component_name=spec["name"],
         app_name=application,
+        app_cluster_context=app_cluster_context,
     )
 
     # uninstalling services, servicemonitors, ingresses ...
@@ -144,9 +160,10 @@ def delete_comp(spec):
         # Uninstall service
         for exp in spec["expose"]:
             if exp["is-peered"] == True:
-                uninstall_service_2(
+                uninstall_service(
                     component_name=spec["name"],
                     app_name=spec["application"],
+                    app_cluster_context=app_cluster_context,
                 )
                 # Break since we have only one service for each component
                 break
@@ -154,9 +171,10 @@ def delete_comp(spec):
         # Uninstall ServiceMonitor
         for exp in spec["expose"]:
             if exp["is-exposing-metrics"] == True:
-                uninstall_servicemonitor_2(
+                uninstall_servicemonitor(
                     component_name=spec["name"],
                     app_name=spec["application"],
+                    app_cluster_context=app_cluster_context,
                 )
                 # Break since we have only one ServiceMonitor for each component
                 break
@@ -164,20 +182,33 @@ def delete_comp(spec):
         # Ingress
         for exp in spec["expose"]:
             if exp["is-public"] == True:
-                remove_host_from_ingress_2(
+                remove_host_from_ingress(
                     app_name=spec["application"],
                     component_name=spec["name"],
+                    app_cluster_context=app_cluster_context,
                 )
                 break
 
 
 def update_comp_deployment(spec: dict):
-    application = spec["application"]
+    # get context
+    app_cluster, _ = _get_app_and_comp_cluster(
+        app_name=spec["application"], component_name=spec["name"]
+    )
+    app_cluster_context = _get_context(cluster=app_cluster)
     # Re-apply the deployment
-    install_deployment(component=spec, app_name=application, update=True)
+    install_deployment(
+        component=spec, app_cluster_context=app_cluster_context, update=True
+    )
 
 
 def update_comp_expose_field(spec: dict, old: list, new: list):
+    # get context
+    app_cluster, _ = _get_app_and_comp_cluster(
+        app_name=spec["application"], component_name=spec["name"]
+    )
+    app_cluster_context = _get_context(cluster=app_cluster)
+    #
     component_name = spec["name"]
     application = spec["application"]
     # ------------- UPDATE SERVICE -------------#
@@ -192,6 +223,7 @@ def update_comp_expose_field(spec: dict, old: list, new: list):
         install_service(
             component_name=component_name,
             app_name=application,
+            app_cluster_context=app_cluster_context,
             ports_list=peered_ports,
             update=update,
         )
@@ -204,6 +236,7 @@ def update_comp_expose_field(spec: dict, old: list, new: list):
             uninstall_service(
                 component_name=component_name,
                 app_name=application,
+                app_cluster_context=app_cluster_context,
             )
 
     # ------------- UPDATE SERVICEMONITOR -------------#
@@ -222,6 +255,7 @@ def update_comp_expose_field(spec: dict, old: list, new: list):
         # Re-aplly the ServiceMonitor
         install_servicemonitor(
             app_name=application,
+            app_cluster_context=app_cluster_context,
             component_name=component_name,
             ports_list=exposing_metrics_ports,
             update=update,
@@ -233,6 +267,7 @@ def update_comp_expose_field(spec: dict, old: list, new: list):
             uninstall_servicemonitor(
                 component_name=component_name,
                 app_name=application,
+                app_cluster_context=app_cluster_context,
             )
 
     # ------------- UPDATE INGRESS -------------#
@@ -254,6 +289,7 @@ def update_comp_expose_field(spec: dict, old: list, new: list):
     if new_public_port is not None and old_public_port is None:
         add_host_to_ingress(
             app_name=application,
+            app_cluster_context=app_cluster_context,
             component_name=component_name,
             port=new_public_port["clusterPort"],
         )
@@ -262,6 +298,7 @@ def update_comp_expose_field(spec: dict, old: list, new: list):
     if new_public_port is None and old_public_port is not None:
         remove_host_from_ingress(
             app_name=application,
+            app_cluster_context=app_cluster_context,
             component_name=component_name,
         )
 
@@ -273,6 +310,7 @@ def update_comp_expose_field(spec: dict, old: list, new: list):
     ):
         update_host_in_ingress(
             app_name=application,
+            app_cluster_context=app_cluster_context,
             component_name=component_name,
             new_port=new_public_port["clusterPort"],
         )
