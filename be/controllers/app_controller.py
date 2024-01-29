@@ -1,4 +1,5 @@
 from controllers.helpers.functions import (
+    _get_app_and_comp_cluster,
     add_host_to_ingress,
     create_namespace,
     delete_component,
@@ -8,9 +9,13 @@ from controllers.helpers.functions import (
     install_service,
     install_servicemonitor,
     remove_host_from_ingress,
+    remove_host_from_ingress_2,
     uninstall_deployment,
+    uninstall_deployment_2,
     uninstall_service,
+    uninstall_service_2,
     uninstall_servicemonitor,
+    uninstall_servicemonitor_2,
     update_host_in_ingress,
 )
 import os
@@ -49,10 +54,9 @@ def delete_app(spec: dict):
     # 1 - Retireving application cluster and application name from the body
     app_name = spec["name"]
     app_cluster = spec["cluster"]
-    # for component in spec["components"]:
-    #     # Delete the component CRD from the management cluster
-    #     delete_component(component_name=component["name"], app_name=app_name)
-    # # 2 - Unpeering and namespace un-offloading, if this will not break the current or another application
+    for component in spec["components"]:
+        # Delete the component CRD from the management cluster
+        delete_component(component_name=component["name"], app_name=app_name)
     # TODO: .......
     # 3 Deleting the namespace
     delete_namespace(namespace_name=app_name, app_cluster=app_cluster)
@@ -127,9 +131,10 @@ def create_comp(spec: dict):
 
 
 def delete_comp(spec):
+    _get_app_and_comp_cluster(app_name=spec["application"], component_name=spec["name"])
     application = spec["application"]
     # uninstall the deployment
-    uninstall_deployment(
+    uninstall_deployment_2(
         component_name=spec["name"],
         app_name=application,
     )
@@ -139,7 +144,7 @@ def delete_comp(spec):
         # Uninstall service
         for exp in spec["expose"]:
             if exp["is-peered"] == True:
-                uninstall_service(
+                uninstall_service_2(
                     component_name=spec["name"],
                     app_name=spec["application"],
                 )
@@ -149,7 +154,7 @@ def delete_comp(spec):
         # Uninstall ServiceMonitor
         for exp in spec["expose"]:
             if exp["is-exposing-metrics"] == True:
-                uninstall_servicemonitor(
+                uninstall_servicemonitor_2(
                     component_name=spec["name"],
                     app_name=spec["application"],
                 )
@@ -159,7 +164,7 @@ def delete_comp(spec):
         # Ingress
         for exp in spec["expose"]:
             if exp["is-public"] == True:
-                remove_host_from_ingress(
+                remove_host_from_ingress_2(
                     app_name=spec["application"],
                     component_name=spec["name"],
                 )
