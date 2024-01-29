@@ -6,6 +6,7 @@ from fastapi import HTTPException
 import yaml
 import os
 import logging
+import time
 
 
 group = os.environ.get("CRD_GROUP")
@@ -32,38 +33,38 @@ def create_namespace(namespace_name: str, app_cluster: str):
         api_instance.create_namespace(body=new_namespace)
         logging.info(f"Namespace {namespace_name} created successfully!.")
     except ConfigException as _:
-        logging.error(f"Error: load_kube_config [app_controller.create_namespace]")
+        logging.error("Error: load_kube_config [create_namespace]")
         raise HTTPException(status_code=500)
     except ApiException as e:
-        logging.error("Error: app_controller.create_namespace.")
+        logging.error("Error: [create_namespace function].")
         raise HTTPException(status_code=e.status)
 
 
 def delete_namespace(namespace_name: str, app_cluster: str):
     try:
-        # Delete namespace in the app_cluster
-        app_cluster_context = _get_context(app_cluster)
-        config.load_kube_config(context=app_cluster_context)
-        api_instance = client.CoreV1Api()
-        api_instance.delete_namespace(
-            name=namespace_name, body=client.V1DeleteOptions()
-        )
         # Delete namespace in the management-cluster
         config.load_kube_config()
         api_instance = client.CoreV1Api()
         api_instance.delete_namespace(
             name=namespace_name, body=client.V1DeleteOptions()
         )
+        # Delete namespace in the app_cluster
+        app_cluster_context = _get_context(cluster=app_cluster)
+        config.load_kube_config(context=app_cluster_context)
+        api_instance = client.CoreV1Api()
+        api_instance.delete_namespace(
+            name=namespace_name, body=client.V1DeleteOptions()
+        )
         logging.info(f"Namespace {namespace_name} deleted successfully!")
     except ConfigException as _:
-        logging.error(f"Error: load_kube_config [app_controller.delete_namespace]")
+        logging.error(f"Error: load_kube_config [delete_namespace]")
         raise HTTPException(status_code=500)
     except ApiException as e:
-        logging.error("Error: app_controller.delete_namespace.")
+        logging.error("Error: delete_namespace.")
         raise HTTPException(status_code=e.status)
 
 
-def install_deployment(component: dict, app_name: str, update: bool):
+def install_deployment(component: dict, app_name: str, update: bool = False):
     # Get the app instance of the component
     app_cluster, comp_cluster = _get_app_and_comp_cluster(
         app_name=app_name, component_name=component["name"]
@@ -94,9 +95,7 @@ def install_deployment(component: dict, app_name: str, update: bool):
         yaml_output = yaml.safe_load(rendered_deployment)
 
     except Exception as _:
-        logging.error(
-            "Error: <<app.controller.install_deployment>> when generating the yaml file."
-        )
+        logging.error("Error: <<install_deployment>> when generating the yaml file.")
         raise HTTPException(status_code=500)
 
     # Applying the output yaml file
@@ -118,10 +117,10 @@ def install_deployment(component: dict, app_name: str, update: bool):
             logging.info("Deployment updated successfully!")
 
     except ConfigException as _:
-        logging.error(f"Error: load_kube_config [app_controller.install_deployment]")
+        logging.error(f"Error: load_kube_config [install_deployment]")
         raise HTTPException(status_code=500)
     except ApiException as e:
-        logging.error("Error: app_controller.install_deployment")
+        logging.error("Error: install_deployment")
         raise HTTPException(e.status)
 
 
@@ -141,10 +140,10 @@ def uninstall_deployment(component_name: str, app_name: str):
         )
         logging.info("Deployment uninstalled successfully!")
     except ConfigException as _:
-        logging.error("Error: load_kube_config [app_controller.uninstall_deployment]")
+        logging.error("Error: load_kube_config [uninstall_deployment]")
         raise HTTPException(status_code=500)
     except ApiException as e:
-        logging.error("Error: app_controller.uninstall_deployment")
+        logging.error("Error: uninstall_deployment")
         raise HTTPException(status_code=e.status)
 
 
@@ -152,7 +151,7 @@ def install_service(
     component_name: str,
     app_name: str,
     ports_list: list,
-    update: bool,
+    update: bool = False,
 ):
     # Get the app instance of the component
     app_cluster, _ = _get_app_and_comp_cluster(
@@ -175,9 +174,7 @@ def install_service(
 
         yaml_output = yaml.safe_load(rendered_service)
     except Exception as _:
-        logging.error(
-            "Error: <<app_controller.install_service>> when generating the yaml file"
-        )
+        logging.error("Error: <<install_service>> when generating the yaml file")
         raise HTTPException(status_code=500)
 
     # Applying the output yaml_output
@@ -195,10 +192,10 @@ def install_service(
             )
             logging.info("Service updated successfully!")
     except ConfigException as _:
-        logging.error("Error: load_kube_config [app_controller.install_service]")
+        logging.error("Error: load_kube_config [install_service]")
         raise HTTPException(status_code=500)
     except ApiException as e:
-        logging.error("Error: app_controller.install_service")
+        logging.error("Error: install_service")
         raise HTTPException(status_code=e.status)
 
 
@@ -216,10 +213,10 @@ def uninstall_service(component_name: str, app_name: str):
         api_instance.delete_namespaced_service(name=component_name, namespace=app_name)
         logging.info("Service uninstalled successfully!")
     except ConfigException as _:
-        logging.error("Error: load_kube_config [app_controller.uninstall_service]")
+        logging.error("Error: load_kube_config [uninstall_service]")
         raise HTTPException(status_code=500)
     except ApiException as e:
-        logging.error("Error: app_controller.uninstall_service")
+        logging.error("Error: uninstall_service")
         raise HTTPException(status_code=e.status)
 
 
@@ -228,7 +225,7 @@ def install_servicemonitor(
     app_name: str,
     component_name: str,
     ports_list: list,
-    update: bool,
+    update: bool = False,
 ):
     # Get the app instance of the component
     app_cluster, _ = _get_app_and_comp_cluster(
@@ -251,9 +248,7 @@ def install_servicemonitor(
 
         yaml_output = yaml.safe_load(rendered_service_monitor)
     except Exception as _:
-        logging.error(
-            "Error: <<app_controller.install_servicemonitor>> when generating the yaml file"
-        )
+        logging.error("Error: <<install_servicemonitor>> when generating the yaml file")
         raise HTTPException(status_code=500)
 
     try:
@@ -292,10 +287,10 @@ def install_servicemonitor(
             )
             logging.info("ServiceMonitor updated successfully!")
     except ConfigException as _:
-        logging.error("Error: load_kube_config [app_controller.install_servicemonitor]")
+        logging.error("Error: load_kube_config [install_servicemonitor]")
         raise HTTPException(status_code=500)
     except ApiException as e:
-        logging.error("Error: app_controller.install_servicemonitor")
+        logging.error("Error: install_servicemonitor")
         raise HTTPException(status_code=e.status)
 
 
@@ -319,10 +314,10 @@ def uninstall_servicemonitor(component_name: str, app_name: str):
             body=client.V1DeleteOptions(),
         )
     except ConfigException as _:
-        logging.error("Error: load_kube_config [app_controller.install_servicemonitor]")
+        logging.error("Error: load_kube_config [install_servicemonitor]")
         raise HTTPException(status_code=500)
     except ApiException as e:
-        logging.error("Error: app_controller.install_servicemonitor")
+        logging.error("Error: install_servicemonitor")
         raise HTTPException(status_code=e.status)
 
 
@@ -340,11 +335,14 @@ def delete_component(component_name: str, app_name: str):
             body=client.V1DeleteOptions(),
         )
     except ConfigException as _:
-        logging.error("Error: load_kube_config [app_controller.delete_component]")
+        logging.error("Error: load_kube_config [delete_component]")
         raise HTTPException(status_code=500)
     except ApiException as e:
-        logging.error("Error: app_controller.delete_component")
-        raise HTTPException(status_code=e.status)
+        if e.status == 404:
+            logging.info("Component doesn't exist.")
+        else:
+            logging.error("Exception: [delete_component function]")
+            raise HTTPException(status_code=e.status)
 
 
 def add_host_to_ingress(app_name: str, component_name: str, port: int):
@@ -379,9 +377,7 @@ def add_host_to_ingress(app_name: str, component_name: str, port: int):
         )
         yaml_output = yaml.safe_load(rendered_ingress)
     except Exception as _:
-        logging.error(
-            "Error: <<app_controller.add_host_to_ingress>> when generating the yaml file"
-        )
+        logging.error("Error: <<add_host_to_ingress>> when generating the yaml file")
         raise HTTPException(status_code=500)
 
     try:
@@ -395,10 +391,10 @@ def add_host_to_ingress(app_name: str, component_name: str, port: int):
             )
             logging.info("ingress updated successfully!")
     except ConfigException as _:
-        logging.error("Error: load_kube_config [app_controller.add_host_to_ingress]")
+        logging.error("Error: load_kube_config [add_host_to_ingress]")
         raise HTTPException(status_code=500)
     except ApiException as e:
-        logging.error("Error: app_controller.add_host_to_ingress")
+        logging.error("Error: add_host_to_ingress")
         raise HTTPException(status_code=e.status)
 
 
@@ -440,9 +436,7 @@ def remove_host_from_ingress(component_name: str, app_name: str):
                 name=f"{app_name}-ingress", namespace=app_name, body=yaml_output
             )
     except ConfigException as _:
-        logging.error(
-            "Error: load_kube_config [app_controller.remove_host_from_ingress]"
-        )
+        logging.error("Error: load_kube_config [remove_host_from_ingress]")
         raise HTTPException(status_code=500)
     except ApiException as e:
         raise HTTPException(status_code=e.status)
@@ -484,7 +478,7 @@ def update_host_in_ingress(component_name: str, app_name: str, new_port: int):
             name=f"{app_name}-ingress", namespace=app_name, body=yaml_output
         )
     except ConfigException as _:
-        logging.error("Error: load_kube_config [app_controller.update_host_in_ingress]")
+        logging.error("Error: load_kube_config [update_host_in_ingress]")
         raise HTTPException(status_code=500)
     except ApiException as e:
         raise HTTPException(status_code=e.status)
@@ -527,10 +521,10 @@ def _get_app_and_comp_cluster(
                 break
         return app_cluster, comp_cluster
     except ConfigException as _:
-        logging.error("Error: load_kube_config [app_controller.get_app_instance]")
+        logging.error("Error: load_kube_config [get_app_instance]")
         raise HTTPException(status_code=500)
     except ApiException as e:
-        logging.error("Error: app_controller.get_app_instance")
+        logging.error("Error: get_app_instance")
         raise HTTPException(status_code=e.status)
 
 
@@ -551,9 +545,38 @@ def _get_existing_hosts(app_cluster_context: str, app_name: str):
             )
         return hosts
     except ConfigException as _:
-        logging.error(
-            "Error: load_kube_config [app_controller.add_host_to_ingress (_get_ingress)]"
-        )
+        logging.error("Error: load_kube_config [add_host_to_ingress (_get_ingress)]")
         raise HTTPException(status_code=500)
     except ApiException as e:
         raise e
+
+
+def get_changes(old: dict | None, new: dict | None) -> tuple[list, list, list]:
+    """
+    This function compares between the old and new dict and returns the changes detected, which could be:
+        - New components added to the application.
+        - Some components Deleted from the application.
+        - Some components changed the cluster (migration).
+    """
+    logging.info("get_changes function is called.")
+    # All the components were added
+    if old is None:
+        return new, [], []
+
+    # All the components were removed
+    if new is None:
+        return [], old, []
+
+    added_components = [obj for obj in new if obj not in old]
+    removed_components = [obj for obj in old if obj not in new]
+
+    old_dict = {obj["name"]: obj["cluster"] for obj in old}
+    new_dict = {obj["name"]: obj["cluster"] for obj in new}
+
+    migrated_components = [
+        {"name": name, "old_cluster": old_dict[name], "new_cluster": new_dict[name]}
+        for name in set(old_dict) & set(new_dict)
+        if old_dict[name] != new_dict[name]
+    ]
+
+    return added_components, removed_components, migrated_components

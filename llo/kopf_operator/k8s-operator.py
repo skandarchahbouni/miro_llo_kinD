@@ -110,7 +110,7 @@ def validate_comp(body, spec, warnings: list[str], **_):
         raise kopf.AdmissionError("metatdata.name must be the same as spec.name")
 
 
-# ---------------------------------- APPLICATION-CRD ---------------------------------- #
+# ---------------------------------- APPLICATION-CRD Handlers---------------------------------- #
 @kopf.on.create("Application")
 def create_app_handler(spec, **_):
     """
@@ -161,7 +161,7 @@ def update_app_handler(spec, old, new, **_):
         logging.error("Something went wrong. [update_app_handler]")
 
 
-# ---------------------------------- COMPONENT-CRD ---------------------------------- #
+# ---------------------------------- COMPONENT-CRD Handlers ---------------------------------- #
 @kopf.on.create("Component")
 def create_comp_handler(spec, **_):
     """

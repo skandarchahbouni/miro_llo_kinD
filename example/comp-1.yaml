@@ -6,7 +6,7 @@ metadata:
 spec:
   application: test-app
   # 1.21.5
-  image: nginx:1.21.5
+  image: nginx:latest
   name: nginx-component
   # replicas: 1
   expose:
