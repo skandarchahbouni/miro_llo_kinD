@@ -1,20 +1,5 @@
-from controllers.helpers.functions import (
-    _get_app_and_comp_cluster,
-    add_host_to_ingress,
-    create_namespace,
-    delete_component,
-    delete_namespace,
-    get_changes,
-    install_deployment,
-    install_service,
-    install_servicemonitor,
-    remove_host_from_ingress,
-    uninstall_deployment,
-    uninstall_service,
-    uninstall_servicemonitor,
-    update_host_in_ingress,
-    _get_context,
-)
+from controllers.helpers import k8s_resource_manager
+from controllers.helpers.utils import get_changes
 import os
 
 group = os.environ.get("CRD_GROUP")
@@ -29,10 +14,15 @@ def create_app(spec: dict):
     app_name = spec["name"]
 
     # Get the context of the app_cluster
-    app_cluster_context = _get_context(cluster=app_cluster)
+    app_cluster_context = k8s_resource_manager.get_context(cluster=app_cluster)
     # Create namesapce in the app_cluster
-    create_namespace(namespace_name=app_name, app_cluster_context=app_cluster_context)
-
+    k8s_resource_manager.create_namespace(
+        namespace_name=app_name, app_cluster_context=app_cluster_context
+    )
+    # Create namesapce in the management cluster
+    k8s_resource_manager.create_namespace(
+        namespace_name=app_name, app_cluster_context=None
+    )
     # Linking between the app_cluster and the components clusters
     components_list = spec["components"]
 
@@ -54,19 +44,28 @@ def delete_app(spec: dict):
 
     for component in spec["components"]:
         # Delete the component CRD from the management cluster
-        delete_component(component_name=component["name"], app_name=app_name)
+        k8s_resource_manager.delete_component(
+            component_name=component["name"], app_name=app_name
+        )
     # TODO: .......
     # Deleting the namespace
 
     # Get the context of the app_cluster
-    app_cluster_context = _get_context(cluster=app_cluster)
-    delete_namespace(namespace_name=app_name, app_cluster_context=app_cluster_context)
+    app_cluster_context = k8s_resource_manager.get_context(cluster=app_cluster)
+    # Delete the namespace from the management cluster
+    k8s_resource_manager.delete_namespace(
+        namespace_name=app_name, app_cluster_context=None
+    )
+    # Delete the namespace from the app_cluster
+    k8s_resource_manager.delete_namespace(
+        namespace_name=app_name, app_cluster_context=app_cluster_context
+    )
 
 
 def update_app(spec: dict, old: list, new: list):
     added_components, removed_components, migrated_components = get_changes(old, new)
 
-    # 1 - New components added to the application
+    # New components added to the application
     # We have to do the peering and the namespace offloading if this is not already done.
     if len(added_components):
         # The clusters already peered:
@@ -76,15 +75,17 @@ def update_app(spec: dict, old: list, new: list):
                 # TODO: do the peering and the namespace offloading
                 pass
 
-    # 2 - Some components removed from the application
+    # Some components removed from the application
     # Here we have to delete the component, and un-offload the namespace and unpeer the clusters if this is not already done
     for component in removed_components:
         # Delete the component
-        delete_component(component_name=component["name"], app_name=spec["name"])
+        k8s_resource_manager.delete_component(
+            component_name=component["name"], app_name=spec["name"]
+        )
 
     # TODO: unpeer and un-offload the namespace if it's not needed by the current or another application (removed component)
 
-    # 3 - Migration
+    # Migration
     for component in migrated_components:
         # TODO: launch the migration of the component from the old cluster to the new cluster
         pass
@@ -93,32 +94,34 @@ def update_app(spec: dict, old: list, new: list):
 # ------------------------------------------------------------ #
 def create_comp(spec: dict):
     # get context
-    app_cluster, _ = _get_app_and_comp_cluster(
+    app_cluster, _ = k8s_resource_manager.get_app_and_comp_cluster(
         app_name=spec["application"], component_name=spec["name"]
     )
-    app_cluster_context = _get_context(cluster=app_cluster)
+    app_cluster_context = k8s_resource_manager.get_context(cluster=app_cluster)
     application = spec["application"]
-    # install the deployment
-    install_deployment(component=spec, app_cluster_context=app_cluster_context)
+    # apply the deployment
+    k8s_resource_manager.apply_deployment(
+        component=spec, app_cluster_context=app_cluster_context
+    )
 
-    # Installing service
+    # Applying service
     # First, we need to filter only the ports where "is-peered" is set to True (is-peered=True)
     peered_ports = [port for port in spec["expose"] if port["is-peered"] == True]
     if len(peered_ports):
-        install_service(
+        k8s_resource_manager.apply_service(
             component_name=spec["name"],
             app_name=spec["application"],
             app_cluster_context=app_cluster_context,
             ports_list=peered_ports,
         )
 
-    # Installing ServiceMonitor
+    # Applying ServiceMonitor
     # First, we need to filter only the ports where "is-exposing-metrics" is set to True (is-exposing-metrics=True)
     exposing_metrics_ports = [
         item for item in spec["expose"] if item["is-exposing-metrics"] == True
     ]
     if len(exposing_metrics_ports):
-        install_servicemonitor(
+        k8s_resource_manager.apply_servicemonitor(
             app_name=spec["application"],
             app_cluster_context=app_cluster_context,
             component_name=spec["name"],
@@ -128,7 +131,7 @@ def create_comp(spec: dict):
     # Ingress
     for exp in spec["expose"]:
         if exp["is-public"] == True:
-            add_host_to_ingress(
+            k8s_resource_manager.add_host_to_ingress(
                 app_name=spec["application"],
                 app_cluster_context=app_cluster_context,
                 component_name=spec["name"],
@@ -141,26 +144,26 @@ def create_comp(spec: dict):
 
 def delete_comp(spec):
     # get context
-    app_cluster, _ = _get_app_and_comp_cluster(
+    app_cluster, _ = k8s_resource_manager.get_app_and_comp_cluster(
         app_name=spec["application"], component_name=spec["name"]
     )
-    app_cluster_context = _get_context(cluster=app_cluster)
+    app_cluster_context = k8s_resource_manager.get_context(cluster=app_cluster)
 
     #
     application = spec["application"]
-    # uninstall the deployment
-    uninstall_deployment(
+    # delete the deployment
+    k8s_resource_manager.delete_deployment(
         component_name=spec["name"],
         app_name=application,
         app_cluster_context=app_cluster_context,
     )
 
-    # uninstalling services, servicemonitors, ingresses ...
+    # Deleting services, servicemonitors, ingresses ...
     if "expose" in spec and spec["expose"]:
-        # Uninstall service
+        # Delete service
         for exp in spec["expose"]:
             if exp["is-peered"] == True:
-                uninstall_service(
+                k8s_resource_manager.delete_service(
                     component_name=spec["name"],
                     app_name=spec["application"],
                     app_cluster_context=app_cluster_context,
@@ -168,10 +171,10 @@ def delete_comp(spec):
                 # Break since we have only one service for each component
                 break
 
-        # Uninstall ServiceMonitor
+        # Delete ServiceMonitor
         for exp in spec["expose"]:
             if exp["is-exposing-metrics"] == True:
-                uninstall_servicemonitor(
+                k8s_resource_manager.delete_servicemonitor(
                     component_name=spec["name"],
                     app_name=spec["application"],
                     app_cluster_context=app_cluster_context,
@@ -182,7 +185,7 @@ def delete_comp(spec):
         # Ingress
         for exp in spec["expose"]:
             if exp["is-public"] == True:
-                remove_host_from_ingress(
+                k8s_resource_manager.remove_host_from_ingress(
                     app_name=spec["application"],
                     component_name=spec["name"],
                     app_cluster_context=app_cluster_context,
@@ -192,23 +195,23 @@ def delete_comp(spec):
 
 def update_comp_deployment(spec: dict):
     # get context
-    app_cluster, _ = _get_app_and_comp_cluster(
+    app_cluster, _ = k8s_resource_manager.get_app_and_comp_cluster(
         app_name=spec["application"], component_name=spec["name"]
     )
-    app_cluster_context = _get_context(cluster=app_cluster)
+    app_cluster_context = k8s_resource_manager.get_context(cluster=app_cluster)
     # Re-apply the deployment
-    install_deployment(
+    k8s_resource_manager.apply_deployment(
         component=spec, app_cluster_context=app_cluster_context, update=True
     )
 
 
 def update_comp_expose_field(spec: dict, old: list, new: list):
     # get context
-    app_cluster, _ = _get_app_and_comp_cluster(
+    app_cluster, _ = k8s_resource_manager.get_app_and_comp_cluster(
         app_name=spec["application"], component_name=spec["name"]
     )
-    app_cluster_context = _get_context(cluster=app_cluster)
-    #
+    app_cluster_context = k8s_resource_manager.get_context(cluster=app_cluster)
+    # Update
     component_name = spec["name"]
     application = spec["application"]
     # ------------- UPDATE SERVICE -------------#
@@ -220,7 +223,7 @@ def update_comp_expose_field(spec: dict, old: list, new: list):
             update = True
         else:
             update = False
-        install_service(
+        k8s_resource_manager.apply_service(
             component_name=component_name,
             app_name=application,
             app_cluster_context=app_cluster_context,
@@ -233,7 +236,7 @@ def update_comp_expose_field(spec: dict, old: list, new: list):
         # Check whether the service was created before
         if len(old_peered_ports):
             # Delete the service
-            uninstall_service(
+            k8s_resource_manager.delete_service(
                 component_name=component_name,
                 app_name=application,
                 app_cluster_context=app_cluster_context,
@@ -253,7 +256,7 @@ def update_comp_expose_field(spec: dict, old: list, new: list):
         else:
             update = False
         # Re-aplly the ServiceMonitor
-        install_servicemonitor(
+        k8s_resource_manager.apply_servicemonitor(
             app_name=application,
             app_cluster_context=app_cluster_context,
             component_name=component_name,
@@ -264,7 +267,7 @@ def update_comp_expose_field(spec: dict, old: list, new: list):
     else:
         if len(old_exposing_metrics_ports):
             # Delete the ServiceMonitor
-            uninstall_servicemonitor(
+            k8s_resource_manager.delete_servicemonitor(
                 component_name=component_name,
                 app_name=application,
                 app_cluster_context=app_cluster_context,
@@ -287,7 +290,7 @@ def update_comp_expose_field(spec: dict, old: list, new: list):
 
     # The component was not public, and updated to be public
     if new_public_port is not None and old_public_port is None:
-        add_host_to_ingress(
+        k8s_resource_manager.add_host_to_ingress(
             app_name=application,
             app_cluster_context=app_cluster_context,
             component_name=component_name,
@@ -296,7 +299,7 @@ def update_comp_expose_field(spec: dict, old: list, new: list):
 
     # The component was public, and updated to be not public
     if new_public_port is None and old_public_port is not None:
-        remove_host_from_ingress(
+        k8s_resource_manager.remove_host_from_ingress(
             app_name=application,
             app_cluster_context=app_cluster_context,
             component_name=component_name,
@@ -308,7 +311,7 @@ def update_comp_expose_field(spec: dict, old: list, new: list):
         and old_public_port is not None
         and new_public_port["clusterPort"] != old_public_port["clusterPort"]
     ):
-        update_host_in_ingress(
+        k8s_resource_manager.update_host_in_ingress(
             app_name=application,
             app_cluster_context=app_cluster_context,
             component_name=component_name,

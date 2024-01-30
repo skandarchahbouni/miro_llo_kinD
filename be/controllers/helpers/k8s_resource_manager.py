@@ -15,15 +15,7 @@ TEMPLATE_DIR = os.environ.get("TEMPLATE_DIR")
 
 def create_namespace(namespace_name: str, app_cluster_context: str):
     try:
-        # Create namespace in the app cluster
         config.load_kube_config(context=app_cluster_context)
-        api_instance = client.CoreV1Api()
-        new_namespace = client.V1Namespace(
-            metadata=client.V1ObjectMeta(name=namespace_name)
-        )
-        api_instance.create_namespace(body=new_namespace)
-        # Create namespace in the management cluster
-        config.load_kube_config()
         api_instance = client.CoreV1Api()
         new_namespace = client.V1Namespace(
             metadata=client.V1ObjectMeta(name=namespace_name)
@@ -40,13 +32,6 @@ def create_namespace(namespace_name: str, app_cluster_context: str):
 
 def delete_namespace(namespace_name: str, app_cluster_context: str):
     try:
-        # Delete namespace in the management-cluster
-        config.load_kube_config()
-        api_instance = client.CoreV1Api()
-        api_instance.delete_namespace(
-            name=namespace_name, body=client.V1DeleteOptions()
-        )
-        # Delete namespace in the app_cluster
         config.load_kube_config(context=app_cluster_context)
         api_instance = client.CoreV1Api()
         api_instance.delete_namespace(
@@ -61,7 +46,7 @@ def delete_namespace(namespace_name: str, app_cluster_context: str):
         raise HTTPException(status_code=e.status)
 
 
-def install_deployment(component: dict, app_cluster_context: str, update: bool = False):
+def apply_deployment(component: dict, app_cluster_context: str, update: bool = False):
     # Loading the template
     try:
         environment = Environment(loader=FileSystemLoader(TEMPLATE_DIR))
@@ -111,7 +96,7 @@ def install_deployment(component: dict, app_cluster_context: str, update: bool =
         raise HTTPException(e.status)
 
 
-def uninstall_deployment(component_name: str, app_name: str, app_cluster_context: str):
+def delete_deployment(component_name: str, app_name: str, app_cluster_context: str):
     try:
         config.load_kube_config(context=app_cluster_context)
         api_instance = client.AppsV1Api()
@@ -127,7 +112,7 @@ def uninstall_deployment(component_name: str, app_name: str, app_cluster_context
         raise HTTPException(status_code=e.status)
 
 
-def install_service(
+def apply_service(
     component_name: str,
     app_name: str,
     app_cluster_context: str,
@@ -172,7 +157,7 @@ def install_service(
         raise HTTPException(status_code=e.status)
 
 
-def uninstall_service(component_name: str, app_name: str, app_cluster_context: str):
+def delete_service(component_name: str, app_name: str, app_cluster_context: str):
     try:
         config.load_kube_config(context=app_cluster_context)
         api_instance = client.CoreV1Api()
@@ -187,7 +172,7 @@ def uninstall_service(component_name: str, app_name: str, app_cluster_context: s
 
 
 # Still other apps to be implemented
-def install_servicemonitor(
+def apply_servicemonitor(
     app_name: str,
     app_cluster_context: str,
     component_name: str,
@@ -254,9 +239,7 @@ def install_servicemonitor(
         raise HTTPException(status_code=e.status)
 
 
-def uninstall_servicemonitor(
-    component_name: str, app_name: str, app_cluster_context: str
-):
+def delete_servicemonitor(component_name: str, app_name: str, app_cluster_context: str):
     try:
         config.load_kube_config(context=app_cluster_context)
         api_instance = client.CustomObjectsApi()
@@ -426,18 +409,18 @@ def update_host_in_ingress(
         raise HTTPException(status_code=500)
 
 
-def _get_context(cluster: str) -> str:
+def get_context(cluster: str) -> str:
     contexts, _ = config.list_kube_config_contexts()
     for context in contexts:
         cluster_name = context["context"]["cluster"]
         if cluster_name == cluster:
             return context["name"]
     # Raise exception if cluster not found
-    logging.error("ERROR: cluster context not found! [_get_context]")
+    logging.error("ERROR: cluster context not found! [get_context]")
     raise HTTPException(status_code=500)
 
 
-def _get_app_and_comp_cluster(
+def get_app_and_comp_cluster(
     app_name: str, component_name: str
 ) -> tuple[str | None, str | None]:
     try:
@@ -461,10 +444,10 @@ def _get_app_and_comp_cluster(
                 break
         return app_cluster, comp_cluster
     except ConfigException as _:
-        logging.error("Error: load_kube_config [_get_app_and_comp_cluster]")
+        logging.error("Error: load_kube_config [get_app_and_comp_cluster]")
         raise HTTPException(status_code=500)
     except ApiException as e:
-        logging.error("Error: _get_app_and_comp_cluster")
+        logging.error("Error: get_app_and_comp_cluster")
         raise HTTPException(status_code=e.status)
 
 
@@ -489,34 +472,3 @@ def _get_existing_hosts(app_cluster_context: str, app_name: str):
         raise HTTPException(status_code=500)
     except ApiException as e:
         raise e
-
-
-def get_changes(old: dict | None, new: dict | None) -> tuple[list, list, list]:
-    """
-    This function compares between the old and new dict and returns the changes detected, which could be:
-        - New components added to the application.
-        - Some components Deleted from the application.
-        - Some components changed the cluster (migration).
-    """
-    logging.info("get_changes function is called.")
-    # All the components were added
-    if old is None:
-        return new, [], []
-
-    # All the components were removed
-    if new is None:
-        return [], old, []
-
-    added_components = [obj for obj in new if obj not in old]
-    removed_components = [obj for obj in old if obj not in new]
-
-    old_dict = {obj["name"]: obj["cluster"] for obj in old}
-    new_dict = {obj["name"]: obj["cluster"] for obj in new}
-
-    migrated_components = [
-        {"name": name, "old_cluster": old_dict[name], "new_cluster": new_dict[name]}
-        for name in set(old_dict) & set(new_dict)
-        if old_dict[name] != new_dict[name]
-    ]
-
-    return added_components, removed_components, migrated_components
