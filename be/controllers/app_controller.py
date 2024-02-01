@@ -1,5 +1,5 @@
-from controllers.helpers import k8s_resource_manager
-from controllers.helpers.utils import get_changes
+from be.utils import k8s_resource_manager
+from be.utils.helpers import get_changes
 import os
 
 group = os.environ.get("CRD_GROUP")

@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Body, status
-from controllers import app_controller
+from be.controllers import app_controller
 import logging
 
 router = APIRouter()
