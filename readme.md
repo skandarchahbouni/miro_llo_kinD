@@ -82,8 +82,7 @@
 ## Starting the REST API
 
 - Execute the following commands:
-  - `cd be`
-  - `uvicorn main:app --reload`
+  - `uvicorn be.main:app --reload`
 
 ## Starting the Operator
 
