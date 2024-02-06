@@ -18,6 +18,7 @@
 - Run the following commands:
   - `kubectl config use-context kind-management-cluster` <!-- switch the context to the management cluster, consider using kubectx for more flexibility -->
   - `kubectl apply -f crds`
+  -`kubectl apply -f thanos`
 
 ## Setting Up NGINX Controller in the Workload Clusters
 
@@ -37,9 +38,9 @@
   - `kubectl apply -R -f prometheus-operator`
   - `kubectl get pods -n monitoring`
   - `kubectl apply -R -f prometheus`
-  - `docker exec -it workload-2-control-plane bash`
+  <!-- - `docker exec -it workload-2-control-plane bash`
   - `mkdir /mnt/data`
-  - `exit`
+  - `exit` -->
 - Confirm the installation by executing:
   - `kubectl port-forward svc/prometheus-operated 9090:9090 -n monitoring`
   - Visit http://localhost:9090/graph in your browser to verify.
