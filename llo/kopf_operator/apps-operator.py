@@ -1,6 +1,6 @@
 import kopf
 import kubernetes
-from fastapi import status
+from http import HTTPStatus
 import config
 import os
 import re
@@ -121,7 +121,7 @@ def create_app_handler(spec, **_):
     """
     app_module = config.APPS["apps"]
     response = app_module.create_app(spec=spec.__dict__["_src"]["spec"])
-    if response.status_code != status.HTTP_201_CREATED:
+    if response.status_code != HTTPStatus.CREATED:
         logging.error("Something went wrong. [create_app_handler]")
 
 
@@ -136,7 +136,7 @@ def delete_app_handler(spec, **_):
     """
     app_module = config.APPS["apps"]
     response = app_module.delete_app(spec=spec.__dict__["_src"]["spec"])
-    if response.status_code != status.HTTP_204_NO_CONTENT:
+    if response.status_code != HTTPStatus.NO_CONTENT:
         logging.error("Something went wrong. [delete_app_handler]")
 
 
@@ -157,7 +157,7 @@ def update_app_handler(spec, old, new, **_):
     response = app_module.update_app(
         spec=spec.__dict__["_src"]["spec"], old=old, new=new
     )
-    if response.status_code != status.HTTP_200_OK:
+    if response.status_code != HTTPStatus.OK:
         logging.error("Something went wrong. [update_app_handler]")
 
 
@@ -170,7 +170,7 @@ def create_comp_handler(spec, **_):
     """
     app_module = config.APPS["apps"]
     response = app_module.create_comp(spec=spec.__dict__["_src"]["spec"])
-    if response.status_code != status.HTTP_201_CREATED:
+    if response.status_code != HTTPStatus.CREATED:
         logging.error("Something went wrong. [create_comp_handler]")
 
 
@@ -182,7 +182,7 @@ def delete_comp_handler(spec, **_):
     """
     app_module = config.APPS["apps"]
     response = app_module.delete_comp(spec=spec.__dict__["_src"]["spec"])
-    if response.status_code != status.HTTP_204_NO_CONTENT:
+    if response.status_code != HTTPStatus.NO_CONTENT:
         logging.error("Something went wrong. [delete_comp_handler]")
 
 
@@ -196,7 +196,7 @@ def update_comp_handler_deployment(spec, **_):
     # It will return "unchanged" if the deployment didn't change.
     app_module = config.APPS["apps"]
     response = app_module.update_comp_deployment(spec=spec.__dict__["_src"]["spec"])
-    if response.status_code != status.HTTP_200_OK:
+    if response.status_code != HTTPStatus.OK:
         logging.error("Something went wrong. [update_comp_handler_deployment]")
 
 
@@ -212,5 +212,5 @@ def update_comp_handler_expose_field(spec, old, new, **_):
     response = app_module.update_comp_expose_field(
         spec=spec.__dict__["_src"]["spec"], old=old, new=new
     )
-    if response.status_code != status.HTTP_200_OK:
+    if response.status_code != HTTPStatus.OK:
         logging.error("Something went wrong. [update_comp_handler_expose_field]")
