@@ -1,12 +1,16 @@
 import kopf
 import logging
-from kubernetes import client, config
+from kubernetes import client
 from kubernetes.client.rest import ApiException
 from infra_module import infra_module
 import re
 
-# apiGroup
+#-----------------------CONSTS-----------------------
+
 API_GROUP = "miro.onesource.pt"
+SUPPORTED_PROVIDERS_CM_NAME = "supported-providers"
+
+#-----------------------STARTUP CONFIG-----------------------
 
 @kopf.on.startup()
 async def configure(
@@ -28,13 +32,10 @@ def check_clustername_uniqueness(spec, **_):
         for item in clusters["items"]
         if item["spec"]["name"] == cluster_name
     ]
-    logging.info(cluster)
     if len(cluster) != 0:
         raise kopf.AdmissionError(
             f"{cluster_name} cluster already exists"
         )
-
-SUPPORTED_PROVIDERS_CM_NAME = "supported-providers"
 
 @kopf.on.validate("customcluster")
 def check_infra_provider_support_and_properties(spec, **_):
@@ -131,7 +132,8 @@ def check_clusters(spec, **_):
         else:
             raise kopf.AdmissionError(f"{local_cluster} does not exist.")
 
-#-----------------------WEBHOOKS-----------------------
+#-----------------------CUSTOM CLUSTER OPERATIONS-----------------------
+
 def getClusterData(spec):
     # required fields
     clusterData = {
@@ -157,15 +159,61 @@ def getClusterData(spec):
     return clusterData
 
 @kopf.on.create("customcluster")
-def customcluster_create(body, patch, **kwargs):
-    # get cluster data
+def customcluster_create(body, **kwargs):
     clusterData = getClusterData(body["spec"])
-    logging.info(clusterData)
-
-    # create cluster
+    logging.info(f"Cluster spec: {clusterData}")
     infra_module.create_cluster(clusterData)
-    logging.info(f"custom cluster created {clusterData}")
+    logging.info(f"{clusterData['clusterName']} created!")
 
+@kopf.on.update("customcluster") 
+def customcluster_update(diff, body, **_kwargs):
+    # diff structure:
+    # (
+    #     ('change', ('spec', 'worker-machine-count'), 1, 2),
+    #     ('change', ('spec', 'control-plane-count'), 1, 2)
+    # )
+    cluster_name = body['spec']['name']
+    cluster_update = {}
+    for d in diff:
+        if d[0] == 'change' and d[1] == ('spec', 'worker-machine-count'):
+            cluster_update['workerMachineCount'] = d[3]
+        if d[0] == 'change' and d[1] == ('spec', 'control-plane-count'):
+            cluster_update['controlPlaneCount'] = d[3]
+    if cluster_update:
+        logging.info(f"{cluster_name} update: {cluster_update}")
+        infra_module.update_cluster(cluster_name, cluster_update)
+        logging.info(f"{cluster_name} updated!")
+
+@kopf.on.delete("customcluster")
+def customcluster_delete(body, **kwargs):
+    cluster_name = body["spec"]["name"]
+    infra_module.delete_cluster(cluster_name)
+    logging.info(f"{cluster_name} deleted!")
+
+#-----------------------LINK OPERATIONS-----------------------
+
+@kopf.on.create("link")
+def link_create(body, **kwargs):
+    linkData = {
+        "localCluster": body["spec"]["local-cluster"],
+        "remoteCluster": body["spec"]["remote-cluster"] 
+    }
+    logging.info(f"Link spec: {linkData}")
+    infra_module.link_clusters(linkData)
+    logging.info(f"Link between {linkData['localCluster']} and {linkData['remoteCluster']} created!")
+
+@kopf.on.delete("link")
+def link_delete(body, **kwargs):
+    linkData = {
+        "localCluster": body["spec"]["local-cluster"],
+        "remoteCluster": body["spec"]["remote-cluster"] 
+    }
+    logging.info(f"Link spec: {linkData}")
+    infra_module.unlink_clusters(linkData)
+    logging.info(f"Link between {linkData['localCluster']} and {linkData['remoteCluster']} deleted!")
+
+#-----------------------STATUS PROPAGATION-----------------------
+    
 # watch event happening on cluster resource in order to propagate their status to customcluster
 @kopf.on.event('cluster')
 def get_customcluster_status_from_cluster(event, **kwargs):
@@ -181,63 +229,3 @@ def get_customcluster_status_from_cluster(event, **kwargs):
         status["control-plane-ready"] = event["object"]["status"]["controlPlaneReady"]
     # add phase, infrastructureReady and controlPlaneReady status to customcluster
     client.CustomObjectsApi().patch_namespaced_custom_object_status(group=API_GROUP,version="v1",namespace="default",plural="customclusters",name=name,body={"status": status})
-
-@kopf.on.delete("customcluster")
-def customcluster_delete(body, **kwargs):
-    # get cluster name
-    spec = body["spec"]
-    cluster_name = spec["name"]
-
-    # delete cluster
-    infra_module.delete_cluster(cluster_name)
-    logging.info(f"{cluster_name} Deleted!")
-
-@kopf.on.update("customcluster") 
-def customcluster_update(body, **_kwargs):
-    # get cluster data
-    clusterData = getClusterData(body["spec"])
-    logging.info(clusterData)
-
-    # update cluster
-    infra_module.update_cluster(clusterData)
-    logging.info(f"Custom cluster modified {clusterData}")
-
-@kopf.on.create("link")
-def link_create(body,patch, **kwargs):
-    # get link data
-    linkData = {
-        "localCluster": body["spec"]["local-cluster"],
-        "remoteCluster": body["spec"]["remote-cluster"] 
-    }
-
-    # peer clusters
-    infra_module.link_clusters(linkData)
-    logging.info(f"link created {linkData}")
-
-@kopf.on.delete("link")
-def link_delete(body, **kwargs):
-    # get link data
-    linkData = {
-        "localCluster": body["spec"]["local-cluster"],
-        "remoteCluster": body["spec"]["remote-cluster"] 
-    }
-
-    # delete peering
-    infra_module.unlink_clusters(linkData)
-    logging.info(f"link deleted {linkData}")
-
-@kopf.on.update("link")
-def link_update(old, new, **_kwargs):
-    # get old link
-    oldLink = {
-        "localCluster": old["spec"]["local-cluster"],
-        "remoteCluster": old["spec"]["remote-cluster"] 
-    }
-    # get new link
-    newLink = {
-        "localCluster": new["spec"]["local-cluster"],
-        "remoteCluster": new["spec"]["remote-cluster"] 
-    }
-    # update link
-    infra_module.update_links(oldLink,newLink)
-    logging.info(f"link updated from {oldLink} to {newLink}")
