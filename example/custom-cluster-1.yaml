@@ -9,6 +9,6 @@ spec:
   bootstrap-provider: kubeadm
   flavor: development
   name: docker-workload-1
-  kubernetes-version: "v1.25.0"
+  kubernetes-version: "v1.28.0"
   control-plane-count: 1
   worker-machine-count: 1
