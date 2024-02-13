@@ -5,7 +5,7 @@ import tempfile
 import subprocess
 
 class ClusterTemplate:
-    templates_root_path = Path("/home/mouad/pfe/miro_llo_kinD/be_infra/.config")
+    templates_root_path = Path(os.environ.get("CLUSTER_TEMPLATES_PATH"))
     env_vars = {}
 
     def __init__(self, cluster_info: Cluster) -> None:

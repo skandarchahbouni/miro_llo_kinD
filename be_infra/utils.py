@@ -1,5 +1,6 @@
 import subprocess
 import tempfile
+import os
 
 def wait_for_ready_resources():
     cmd = "kubectl --all --all-namespaces wait --timeout 180s --for=condition=Ready cluster"
@@ -23,7 +24,7 @@ def get_kubeconfig(clusterName):
 
 def install_networking_addon(clusterName):
     kubeconfig = get_kubeconfig(clusterName)
-    addon_artifact_path = "/home/mouad/pfe/miro_llo_kinD/be_infra/.config/addons/calico.yaml"
+    addon_artifact_path = os.environ.get("PACKAGES_PATH") + "/networking"
     cmd = f"kubectl apply -f {addon_artifact_path} --kubeconfig {kubeconfig}"
     try:
         subprocess.run(cmd, shell=True, check=True)
