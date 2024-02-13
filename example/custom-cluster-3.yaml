@@ -1,7 +1,7 @@
 apiVersion: miro.onesource.pt/v1
 kind: CustomCluster
 metadata:
-  name: docker-workload-3-cc
+  name: docker-workload-3
 spec:
   infra-provider: docker
   configMapRef:
