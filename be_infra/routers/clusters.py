@@ -4,6 +4,8 @@ from be_infra.schemas.cluster import Cluster
 from be_infra.schemas.cluster_update import ClusterUpdate
 from be_infra.schemas.cluster_template import DockerClusterTemplate
 from be_infra.utils import install_networking_addon, wait_for_ready_resources
+from kubernetes import client,config
+from kubernetes.client.rest import ApiException
 
 clusters_router = APIRouter()
 
@@ -24,8 +26,12 @@ def create_cluster(cluster_info: Cluster):
 
 @clusters_router.delete('/clusters/{cluster_name}')
 def delete_cluster(cluster_name: str):
-    print(cluster_name)
-    return(cluster_name)
+    config.load_kube_config()
+    api = client.CustomObjectsApi()
+    api_response = api.delete_namespaced_custom_object(
+        group="cluster.x-k8s.io",version="v1beta1",namespace="default",plural="clusters",name=cluster_name
+    )
+    return api_response
 
 @clusters_router.patch('/clusters/{cluster_name}')
 def update_cluster(cluster_name: str, cluster_update: ClusterUpdate):

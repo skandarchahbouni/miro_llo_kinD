@@ -228,4 +228,7 @@ def get_customcluster_status_from_cluster(event, **kwargs):
     if "controlPlaneReady" in event["object"]["status"]:
         status["control-plane-ready"] = event["object"]["status"]["controlPlaneReady"]
     # add phase, infrastructureReady and controlPlaneReady status to customcluster
-    client.CustomObjectsApi().patch_namespaced_custom_object_status(group=API_GROUP,version="v1",namespace="default",plural="customclusters",name=name,body={"status": status})
+    try:
+        client.CustomObjectsApi().patch_namespaced_custom_object_status(group=API_GROUP,version="v1",namespace="default",plural="customclusters",name=name,body={"status": status})
+    except ApiException:
+        logging.error(f"{name} customcluster does not exists or already deleted!")
