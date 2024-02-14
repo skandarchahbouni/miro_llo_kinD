@@ -35,6 +35,39 @@ def delete_cluster(cluster_name: str):
 
 @clusters_router.patch('/clusters/{cluster_name}')
 def update_cluster(cluster_name: str, cluster_update: ClusterUpdate):
-    print(f'updated cluster name:{cluster_name}')
-    print(f'updated cluster data:{cluster_update}')
-    return cluster_update
+    config.load_kube_config()
+    api = client.CustomObjectsApi()
+    spec_update= {
+        "spec": {
+            "topology":{
+            }
+        }
+    }
+    if cluster_update.controlPlaneCount:
+        controlPlane = {
+            "replicas": cluster_update.controlPlaneCount
+        }
+        spec_update["spec"]["topology"]["controlPlane"] = controlPlane
+    if cluster_update.workerMachineCount:
+        workers = {
+            "machineDeployments": [
+                {
+                    "class": "default-worker",
+                    "name": "md-0",
+                    "replicas": cluster_update.workerMachineCount
+                }
+            ],
+            "machinePools": [
+                {
+                    "class": "default-worker",
+                    "name": "mp-0",
+                    "replicas": cluster_update.workerMachineCount
+                }
+            ]
+        }
+        spec_update["spec"]["topology"]["workers"] = workers
+    api_response = api.patch_namespaced_custom_object(
+        group="cluster.x-k8s.io",version="v1beta1",namespace="default",plural="clusters",name=cluster_name,
+        body=spec_update
+    )
+    return api_response
