@@ -3,7 +3,7 @@ from typing import Dict
 from be_infra.schemas.cluster import Cluster
 from be_infra.schemas.cluster_update import ClusterUpdate
 from be_infra.schemas.cluster_template import DockerClusterTemplate
-from be_infra.utils import install_networking_addon, wait_for_ready_resources
+from be_infra.utils import install_networking_addon, wait_for_ready_kubeconfig, install_liqo, wait_for_ready_nodes, wait_for_ready_liqo
 from kubernetes import client,config
 from kubernetes.client.rest import ApiException
 
@@ -19,9 +19,16 @@ def create_cluster(cluster_info: Cluster):
     if cluster_template.cluster_artifact_path:
         cluster_template.apply_cluster_artifact()
     # wait for ready resources
-    wait_for_ready_resources()
+    wait_for_ready_kubeconfig(cluster_info.clusterName)
     # install networking add-on
     install_networking_addon(cluster_info.clusterName)
+    # we need control-plane ready before installing liqo
+    wait_for_ready_nodes(cluster_info.clusterName)
+    # install liqo
+    install_liqo(cluster_info.clusterName)
+    # wait for liqo to be ready
+    wait_for_ready_liqo(cluster_info.clusterName)
+
 
 
 @clusters_router.delete('/clusters/{cluster_name}')
