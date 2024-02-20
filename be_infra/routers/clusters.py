@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Body
+from fastapi import APIRouter, HTTPException
 from typing import Dict
 from be_infra.schemas.cluster import Cluster
 from be_infra.schemas.cluster_update import ClusterUpdate
@@ -16,8 +16,10 @@ def create_cluster(cluster_info: Cluster):
         cluster_template = DockerClusterTemplate(cluster_info)
     cluster_template.set_env_vars()
     cluster_template.generate_cluster_artifact_from_template()
-    if cluster_template.cluster_artifact_path:
+    if cluster_template.cluster_artifact:
         cluster_template.apply_cluster_artifact()
+    else:
+        raise HTTPException(status_code=400, detail="failed to generate cluster artifact")
     # wait for ready resources
     wait_for_ready_kubeconfig(cluster_info.clusterName)
     # install networking add-on
@@ -35,9 +37,16 @@ def create_cluster(cluster_info: Cluster):
 def delete_cluster(cluster_name: str):
     config.load_kube_config()
     api = client.CustomObjectsApi()
-    api_response = api.delete_namespaced_custom_object(
-        group="cluster.x-k8s.io",version="v1beta1",namespace="default",plural="clusters",name=cluster_name
-    )
+    try:
+        api_response = api.delete_namespaced_custom_object(
+            group="cluster.x-k8s.io",version="v1beta1",namespace="default",plural="clusters",name=cluster_name
+        )
+    except ApiException as e:
+        print(f"Error: {e}")
+        return e.body
+        # {"kind":"Status","apiVersion":"v1","metadata":{},"status":"Failure",
+        # "message":"clusters.cluster.x-k8s.io \"docker-workload-1\" not found","reason":"NotFound",
+        # "details":{"name":"docker-workload-1","group":"cluster.x-k8s.io","kind":"clusters"},"code":404}
     return api_response
 
 @clusters_router.patch('/clusters/{cluster_name}')
@@ -73,8 +82,12 @@ def update_cluster(cluster_name: str, cluster_update: ClusterUpdate):
             ]
         }
         spec_update["spec"]["topology"]["workers"] = workers
-    api_response = api.patch_namespaced_custom_object(
-        group="cluster.x-k8s.io",version="v1beta1",namespace="default",plural="clusters",name=cluster_name,
-        body=spec_update
-    )
+    try:
+        api_response = api.patch_namespaced_custom_object(
+            group="cluster.x-k8s.io",version="v1beta1",namespace="default",plural="clusters",name=cluster_name,
+            body=spec_update
+        )
+    except ApiException as e:
+        print(f"Error: {e}")
+        return e.body
     return api_response

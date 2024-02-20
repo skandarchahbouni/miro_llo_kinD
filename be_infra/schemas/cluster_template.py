@@ -20,21 +20,22 @@ class ClusterTemplate:
             os.environ[var_name] = str(getattr(self.cluster_info, attr, None))
 
     def generate_cluster_artifact_from_template(self):
-        cluster_artifact_path = None
+        cmd = ["clusterctl", "generate", "cluster", self.cluster_info.clusterName, "--from", self.template_file_path]
         try:
-            with tempfile.NamedTemporaryFile(mode='w', delete=False) as cluster_artifact:
-                cluster_artifact_path = cluster_artifact.name
-                command = f"clusterctl generate cluster {self.cluster_info.clusterName} --from {self.template_file_path} > {cluster_artifact_path}"
-                subprocess.run(command, shell=True, check=True)
-        except (subprocess.CalledProcessError, IOError) as e:
+            result = subprocess.run(cmd, check=True, stdout=subprocess.PIPE, text=True)
+            self.cluster_artifact = result.stdout
+        except subprocess.CalledProcessError as e:
             print(f"Error: {e}")
-        self.cluster_artifact_path = cluster_artifact_path
+            self.cluster_artifact = None
     
     def apply_cluster_artifact(self):
-        command = f"kubectl apply -f {self.cluster_artifact_path}"
         try:
-            subprocess.run(command, shell=True, check=True)
-        except subprocess.CalledProcessError as e:
+            with tempfile.NamedTemporaryFile(mode='w') as cluster_artifact_file:
+                cluster_artifact_file.write(self.cluster_artifact)
+                cluster_artifact_file.seek(0)
+                cmd = ["kubectl", "apply", "-f", cluster_artifact_file.name]
+                subprocess.run(cmd, check=True)
+        except (subprocess.CalledProcessError, IOError) as e:
             print(f"Error: {e}")
 
 
@@ -51,9 +52,9 @@ class DockerClusterTemplate(ClusterTemplate):
     
     def apply_clusterclass_artifact(self):
         clusterclass_artifact_path = self.templates_root_path / self.cluster_info.infraProvider / self.cluster_info.bootstrapProvider / "clusterclass-quick-start.yaml"
-        command = f"kubectl apply -f {str(clusterclass_artifact_path)}"
+        cmd = ["kubectl", "apply", "-f", str(clusterclass_artifact_path)]
         try:
-            subprocess.run(command, shell=True, check=True)
+            subprocess.run(cmd, check=True)
         except subprocess.CalledProcessError as e:
             print(f"Error: {e}")
 
