@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: supported-providers
+data:
+  infra-providers: docker
+  bootstrap-providers: kubeadm

@@ -121,3 +121,41 @@
 
 ## Quick demo:
 - You can view a quick demo via this [link](https://drive.google.com/file/d/1SmXic5TtOZNIYLTRFvr6lSF9BXHx6ptJ/view?usp=sharing).
+
+## Running infra-be and infra-operator
+
+in order to run this you need these packages to be installed on your machine:
+- kubectl
+- clusterctl
+- liqoctl
+- helm
+
+after installing helm you need to install the liqo helm repo by running these commands:
+- helm repo add liqo https://helm.liqo.io/
+- helm repo update
+### Create and set up management cluster
+- run the script in config called create-management-cluster.sh
+- apply some config maps and crds:
+  - kubectl apply -f config/supported-providers-cm.yaml
+  - kubectl apply -f config/providers/docker
+  - kubectl apply -f crds
+
+### Run Operator
+- activate the virtual environment in a seperate terminal window ( source venv/bin/activate)
+- set up ngrok as mentioned above in **Setting Up Ngrok Tunnel (for the Admission Webhook Controller)** section
+- run : kopf run llo/kopf_operator/infra-operator.py
+
+### Run be_infra
+- activate the virtual environment in a seperate terminal window ( source venv/bin/activate)
+- set env variables:
+  - export CLUSTER_TEMPLATES_PATH="the absolute path to be_infra/config/cluster-templates"
+  - export PACKAGES_PATH="the absolute path to be_infra/config/packages"
+- run the following command: uvicorn be_infra.main:app --port 3000 
+  - port 3000 is important because it is hardcoded in the infra-operator
+
+### create two clusters and peer between them
+- kubectl apply -f example/custom-cluster-1.yaml
+- wait for cluster-1 to finish creation (it will take about 4 min)
+- kubectl apply -f example/custom-cluster-2.yaml
+- wait for cluster-2 to finish creation (it will take about 4 min)
+- k apply -f example/link.yaml

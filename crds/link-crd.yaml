@@ -1,0 +1,42 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: links.miro.onesource.pt
+spec:
+  scope: Namespaced
+  group: miro.onesource.pt
+  names:
+    kind: Link
+    plural: links
+    singular: link
+    shortNames:
+    - li
+  versions:
+    - name: v1
+      served: true
+      storage: true
+      subresources: { status: { } }
+      schema: 
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              x-kubernetes-preserve-unknown-fields: true
+              type: object
+              properties:
+                local-cluster:
+                  type: string
+                remote-cluster:
+                  type: string
+            status:
+              type: object
+              x-kubernetes-preserve-unknown-fields: true
+      additionalPrinterColumns:
+        - name: Networking
+          type: string
+          description: "status of the network connection between the two peered clusters"
+          jsonPath: .status.networking
+        - name: Authentication
+          type: string
+          description: "status of authentication process between the two peered clusters"
+          jsonPath: .status.authentication
