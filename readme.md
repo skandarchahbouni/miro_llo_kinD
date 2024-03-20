@@ -117,6 +117,7 @@
   - One to run the operator.
   - One to execute commands (`kubectl apply -f ...`).
 - You will frequently need to switch the context between clusters and namespaces, making it more convenient to install the `kubectx` and `kubens` commands.
+  
 
 ## Quick demo:
 - You can view a quick demo via this links:
