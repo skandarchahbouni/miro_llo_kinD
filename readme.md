@@ -119,6 +119,8 @@
 - You will frequently need to switch the context between clusters and namespaces, making it more convenient to install the `kubectx` and `kubens` commands.
 
 ## Quick demo:
-- You can view a quick demo via this [link](https://drive.google.com/file/d/1SmXic5TtOZNIYLTRFvr6lSF9BXHx6ptJ/view?usp=sharing).
+- You can view a quick demo via this links:
+  - [link-1](https://drive.google.com/file/d/1SmXic5TtOZNIYLTRFvr6lSF9BXHx6ptJ/view?usp=sharing).
+  - [link-2](https://drive.google.com/file/d/1EGiYNZzfDJk2AG-11Vbg2gZ1ZHRsDWyf/view?usp=sharing).
   
  
