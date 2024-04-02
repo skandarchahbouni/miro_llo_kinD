@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>App Creator</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #f4f4f4;
+            margin: 10px;  /* Add margin-top to create space at the top */
+            padding: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+        }
+
+        #appForm {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            width: 400px;
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+
+        label {
+            display: block;
+            margin: 10px 0;
+            font-weight: bold;
+        }
+
+        input,
+        textarea,
+        button {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 15px;
+            box-sizing: border-box;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        button {
+            background-color: #4caf50;
+            color: #fff;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #45a049;
+        }
+
+        .cluster-container {
+            margin-bottom: 20px;
+            border: 1px solid #ccc;
+            padding: 15px;
+            border-radius: 4px;
+        }
+
+        .component {
+            background-color: #f9f9f9;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin-bottom: 10px;
+        }
+
+        #addCluster, #addComponent, #createJSON {
+            background-color: #4caf50;
+            color: #fff;
+            cursor: pointer;
+            border: none;
+            padding: 10px;
+            border-radius: 4px;
+        }
+
+        #addCluster:hover, #addComponent:hover, #createJSON:hover {
+            background-color: #45a049;
+        }
+    </style>
+</head>
+<body>
+    <form id="appForm">
+        <!-- App Information -->
+        <h1>App Creator</h1>
+
+        <label for="appName">App Name:</label>
+        <input type="text" id="appName" name="appName" required>
+
+        <label for="owner">Owner:</label>
+        <input type="text" id="owner" name="owner" required>
+
+        <!-- Decision Information -->
+        <div id="decisionContainer">
+            <h2>Decision</h2>
+            <div class="cluster-container">
+                <label for="clusterName">Cluster Name:</label>
+                <input type="text" class="clusterName" name="clusterName[]" required>
+
+                <label for="components">Components in Cluster (comma-separated):</label>
+                <input type="text" class="components" name="components[]" required>
+            </div>
+        </div>
+
+        <button type="button" id="addCluster">Add Cluster</button>
+
+        <!-- Component Information -->
+        <div id="componentsContainer">
+            <h2>Components</h2>
+            <div class="component">
+                <label for="componentName">Component Name:</label>
+                <input type="text" class="componentName" name="componentName[]" required>
+
+                <label for="image">Component Image:</label>
+                <input type="text" class="image" name="image[]" required>
+
+                <label for="isPublic">Is Public:</label>
+                <input type="checkbox" class="isPublic" name="isPublic[]">
+
+                <label for="isPeered">Is Peered:</label>
+                <input type="checkbox" class="isPeered" name="isPeered[]">
+
+                <label for="containerPort">Container Port:</label>
+                <input type="number" class="containerPort" name="containerPort[]" required>
+
+                <label for="clusterPort">Cluster Port:</label>
+                <input type="number" class="clusterPort" name="clusterPort[]" required>
+            </div>
+        </div>
+
+        <button type="button" id="addComponent">Add Component</button>
+        <button type="button" id="createJSON">Create JSON</button>
+    </form>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            document.getElementById('addCluster').addEventListener('click', function() {
+                // Clone the first cluster and append it to the container
+                var originalClusterContainer = document.querySelector('.cluster-container');
+                var newClusterContainer = originalClusterContainer.cloneNode(true);
+                document.getElementById('decisionContainer').appendChild(newClusterContainer);
+            });
+
+            document.getElementById('addComponent').addEventListener('click', function() {
+                // Clone the first component and append it to the container
+                var originalComponent = document.querySelector('.component');
+                var newComponent = originalComponent.cloneNode(true);
+                document.getElementById('componentsContainer').appendChild(newComponent);
+            });
+
+            document.getElementById('createJSON').addEventListener('click', function() {
+                // Gather information from the form
+                var formData = new FormData(document.getElementById('appForm'));
+                var payload = { decision: {}, app: { components: [] } };
+
+                // Extract decision information
+                var clusterContainers = document.querySelectorAll('.cluster-container');
+                clusterContainers.forEach(function(clusterContainer, clusterIndex) {
+                    var clusterName = formData.getAll('clusterName[]')[clusterIndex];
+                    var componentsInCluster = formData.getAll('components[]')[clusterIndex].split(',').map(name => name.trim());
+
+                    // Add components to the decision field
+                    payload.decision[clusterName] = componentsInCluster;
+                });
+
+                // Extract component information
+                var components = document.querySelectorAll('.component');
+                components.forEach(function(component, index) {
+                    var componentName = formData.getAll('componentName[]')[index];
+                    var image = formData.getAll('image[]')[index];
+                    var isPublic = formData.getAll('isPublic[]')[index] !== undefined;
+                    var isPeered = formData.getAll('isPeered[]')[index] !== undefined;
+                    var containerPort = formData.getAll('containerPort[]')[index];
+                    var clusterPort = formData.getAll('clusterPort[]')[index];
+
+                    // Add component details to the components field
+                    payload.app.components.push({
+                        placement: "CLOUD",
+                        replicas: 1,
+                        cluster_id: null,
+                        id: index + 1,  // Adjust as needed
+                        name: componentName,
+                        image: image,
+                        app_id: 72,
+                        service: {
+                            is_public: isPublic,
+                            is_peered: isPeered,
+                            container_port: containerPort,
+                            protocol: 'TCP',
+                            cluster_port: clusterPort,
+                            component_id: index + 1,  // Adjust as needed
+                        },
+                    });
+                });
+
+                // Extract app information
+                payload.app.id = 72;
+                payload.app.tosca = null;
+                payload.app.updated_at = null;
+                payload.app.created_at = '2024-02-12T16:29:12';
+                payload.app.cluster_id = null; // Handle cluster_id as needed
+                payload.app.name = formData.get('appName');
+                payload.app.owner = formData.get('owner');
+
+                // Print or send the JSON payload to the endpoint
+                fetch('/apps', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(payload),
+                })
+                .then(response => response.json())
+                .then(data => {
+                    console.log('Server response:', data);
+                    // Handle the response as needed
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    // Handle errors
+                });
+            });
+        });
+            
+    </script>
+</body>
+</html>

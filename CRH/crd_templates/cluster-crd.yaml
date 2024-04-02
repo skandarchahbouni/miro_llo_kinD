@@ -1,0 +1,16 @@
+apiVersion: {{version}}
+kind: CustomCluster
+metadata:
+  name: {{name}}
+spec:
+  infra-provider: {{infra_provider}}
+  configMapRef:
+    name: {{conf_map_name}}
+bootstrap-provider: {{bootstrap_provider}}
+name: {{name}}
+kubernetes-version: {{kubernetes_version}}
+control-plane-count: {{control_plane_count}}
+control-plane-flavor: {{control_plane_flavor}}
+worker-machine-count: {{worker_machine_count}}
+worker-machine-flavor: {{worker_machine_flavor}}
+image: {{image}}

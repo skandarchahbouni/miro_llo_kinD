@@ -1,34 +1,29 @@
-# apiVersion: networking.k8s.io/v1beta1
-# kind: Ingress
-# metadata:
-#   name: monitoring
-#   annotations:
-#     ingress.kubernetes.io/whitelist-source-range: 10.0.0.0/16 # change this range to admin IPs
-#     nginx.ingress.kubernetes.io/rewrite-target: /$2
-# spec:
-#   rules:
-#   - http:
-#       paths:
-#       - backend:
-#           serviceName: prometheus-main
-#           servicePort: 9090
-#         path: /prometheus(/|$)(.*)
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: ingress-sidecar-thanos
+  name: khaled
   namespace: monitoring
+  annotations:
+    nginx.ingress.kubernetes.io/backend-protocol: "GRPC"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "false"
+    nginx.ingress.kubernetes.io/grpc-backend: "true"
+    nginx.ingress.kubernetes.io/protocol: "h2c"
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "160"
 spec:
   ingressClassName: nginx
   rules:
-  - host: sidecar-thanos.monitoring.onesource.pt # will change to $CLUSTER_NAME.monitoring.onesource.pt
-    http:
-      paths:
-      - backend:
-          service:
-            name: sidecar-thanos
-            port:
-              number: 10901
-        path: /
-        pathType: ImplementationSpecific
-
+    - host: "workload-4.monitoring.onesource.pt"
+      http:
+        paths:
+          - backend:
+              service:
+                name: side-car
+                port:
+                  number: 10901
+            path: /
+            pathType: ImplementationSpecific
+  tls:
+    - hosts:
+        - sidecar.monitoring.onesource.pt
+      secretName: sidecar-tls-new

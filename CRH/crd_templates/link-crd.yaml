@@ -1,0 +1,7 @@
+apiVersion: {{version}}
+kind: Link
+metadata:
+  name: {{name}}
+spec:
+  local-cluster: {{local_cluster}}
+  remote-cluster: {{remote_cluster}}

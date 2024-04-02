@@ -1,0 +1,29 @@
+apiVersion: {{version}}
+
+kind: Component
+
+metadata:
+
+  name: {{name}}
+
+  namespace: {{name_space}}
+
+spec:
+
+  application: {{app_name}}
+
+  image: {{image_name}}
+
+  name: {{name}}
+
+  expose:
+
+    - is-public: true
+
+      is-peered: true
+
+      is-exposing-metrics: false
+
+      containerPort: 80
+
+      clusterPort: 3000

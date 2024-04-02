@@ -8,6 +8,6 @@ spec:
   cluster: kind-workload-2
   components:
     - name: python-component
-      cluster: kind-workload-2
+      cluster: kind-workload-1
     - name: nginx-component
       cluster: kind-workload-2

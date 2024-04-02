@@ -1,0 +1,22 @@
+apiVersion: {{version}}
+
+kind: Application
+
+metadata:
+
+  name: {{name}}
+
+spec:
+
+  owner: {{owner}}
+
+  name: {{name}}
+
+  cluster: {{cluster}}
+
+  components:
+   {% for comp in components%}
+    - name: {{comp.name}}
+
+      cluster: {{comp.cluster}}
+   {% endfor %}

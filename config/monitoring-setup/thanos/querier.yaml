@@ -17,12 +17,16 @@ spec:
         app.kubernetes.io/name: querier
     spec:
       serviceAccount: thanos
+      # hostAliases:
+      #   - ip: "10.1.0.9"
+      #     hostnames:
+      #       - "khaled.monitoring.onesource.pt"
       securityContext:
         runAsUser: 1001
         fsGroup: 1001
       containers:
         - name: querier
-          image: docker.io/bitnami/thanos:0.31.0
+          image: docker.io/bitnami/thanos:0.34.1
           args:
             - query
             - --log.level=info
@@ -30,8 +34,15 @@ spec:
             - --grpc-address=0.0.0.0:10901
             - --http-address=0.0.0.0:10902
             - --query.replica-label=prometheus_replica
-  #          - --endpoint=cluster-1.monitoring.svc.onesource.pt # to communicate with cluster 1
-  #          - --endpoint=sidecar-2.monitoring.svc.onesource.pt # to communicate with cluster 2
+            # - --grpc-client-tls-secure
+            # - --grpc-client-tls-skip-verify
+            # - --grpc-client-tls-cert=/certs/tls.crt
+            # - --grpc-client-tls-key=/certs/tls.key
+            # - --grpc-client-tls-ca=/certs/ca.crt
+            # - --endpoint=dnssrv+_grpc._tcp.khaled.monitoring.onesource.pt
+
+            - --endpoint=172.18.0.3:10901
+            - --endpoint=172.18.0.4:10901
           ports:
             - name: http
               containerPort: 10902
@@ -64,4 +75,10 @@ spec:
             limits:
               cpu: 500m
               memory: 2Gi
-
+      #     volumeMounts:
+      #       - name: querier-mtls
+      #         mountPath: /certs
+      # volumes:
+      #   - name: querier-mtls
+      #     secret:
+      #       secretName: querier-tls-new
