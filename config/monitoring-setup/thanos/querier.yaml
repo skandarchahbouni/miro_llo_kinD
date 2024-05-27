@@ -40,9 +40,10 @@ spec:
             # - --grpc-client-tls-key=/certs/tls.key
             # - --grpc-client-tls-ca=/certs/ca.crt
             # - --endpoint=dnssrv+_grpc._tcp.khaled.monitoring.onesource.pt
-
-            - --endpoint=172.18.0.3:10901
-            - --endpoint=172.18.0.4:10901
+            # - --store.sd-files=thanos/sdfile.yaml
+            # - --store.sd-interval=10s
+            - --endpoint=khaled.monitoring.svc.cluster.local:10901
+            # - --endpoint=172.18.0.4:10901
           ports:
             - name: http
               containerPort: 10902
@@ -75,10 +76,11 @@ spec:
             limits:
               cpu: 500m
               memory: 2Gi
-      #     volumeMounts:
-      #       - name: querier-mtls
-      #         mountPath: /certs
-      # volumes:
-      #   - name: querier-mtls
-      #     secret:
-      #       secretName: querier-tls-new
+          volumeMounts:
+            - name: sdfile
+              mountPath: thanos
+              readOnly: true
+      volumes:
+        - name: sdfile
+          configMap:
+            name: thanos-cm

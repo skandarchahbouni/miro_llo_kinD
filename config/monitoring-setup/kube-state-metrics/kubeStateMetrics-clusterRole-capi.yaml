@@ -1,0 +1,55 @@
+aggregationRule:
+  clusterRoleSelectors:
+  - matchLabels:
+      kube-state-metrics/aggregate-to-manager: "true"
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: kube-state-metrics-aggregated-role
+  labels:
+    app.kubernetes.io/component: exporter
+    app.kubernetes.io/name: kube-state-metrics
+    app.kubernetes.io/part-of: kube-prometheus
+    app.kubernetes.io/version: 2.11.0
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/component: exporter
+    app.kubernetes.io/name: kube-state-metrics
+    app.kubernetes.io/part-of: kube-prometheus
+    app.kubernetes.io/version: 2.11.0
+    kube-state-metrics/aggregate-to-manager: "true"
+  name: kube-state-metrics-custom-resource-capi
+rules:
+- apiGroups:
+  - cluster.x-k8s.io
+  resources:
+  - clusterclasses
+  - clusters
+  - machinedeployments
+  - machinepools
+  - machinesets
+  - machines
+  - machinehealthchecks
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - controlplane.cluster.x-k8s.io
+  resources:
+  - kubeadmcontrolplanes
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - bootstrap.cluster.x-k8s.io
+  resources:
+  - kubeadmconfigs
+  verbs:
+  - get
+  - list
+  - watch

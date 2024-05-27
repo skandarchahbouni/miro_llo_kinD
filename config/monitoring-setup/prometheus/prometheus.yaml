@@ -36,7 +36,7 @@ spec:
   retention: 6h
   scrapeInterval: 15s
   externalLabels:
-    cluster: "workload-4"
+    cluster: "workload-2"
   securityContext:
     fsGroup: 0
     runAsNonRoot: false

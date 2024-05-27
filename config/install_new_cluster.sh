@@ -1,7 +1,7 @@
 
 
 
-export CLUSTER_NAME="workload-4"
+export CLUSTER_NAME="workload-2"
 export INGRESS_URL=$CLUSTER_NAME."monitoring.onesource.pt"
 export THANOS_QUERY_CONF="monitoring-setup/thanos/querier.yaml"
 export MANAGEMENT_CLUSTER="management"
@@ -10,7 +10,7 @@ export IP='8.8.8.8'
 
 kind create cluster --config="./kind-cluster-config.yaml" --name=$CLUSTER_NAME
 
-echo "[1] creating monitoring name space"
+echo "[1] creating monitoring namespace"
 
 kind get kubeconfig --name $CLUSTER_NAME > new-cluster.kubeconfig
 

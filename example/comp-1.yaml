@@ -2,7 +2,7 @@ apiVersion: miro.onesource.pt/v1
 kind: Component
 metadata:
   name: nginx-component
-  namespace: test-app
+  namespace: default
 spec:
   application: test-app
   # 1.21.5

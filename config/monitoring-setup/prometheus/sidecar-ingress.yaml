@@ -13,7 +13,7 @@ metadata:
 spec:
   ingressClassName: nginx
   rules:
-    - host: "workload-4.monitoring.onesource.pt"
+    - host: "workload-2.monitoring.onesource.pt"
       http:
         paths:
           - backend:

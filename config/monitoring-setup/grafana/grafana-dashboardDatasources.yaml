@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: grafana-datasources
+  namespace: monitoring
+stringData:
+  datasources.yaml: |-
+    {
+        "apiVersion": 1,
+        "datasources": [
+            {
+                "access": "proxy",
+                "editable": false,
+                "name": "thanos",
+                "orgId": 1,
+                "type": "thanos",
+                "url": "http://querier.monitoring.svc.cluster.local:10901",
+                "version": 1
+            }
+        ]
+    }
+type: Opaque
