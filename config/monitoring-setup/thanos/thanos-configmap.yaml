@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: thanos-cm
+  namespace: monitoring
+data:
+  sdfile.yaml: |
+    - targets: 
+      - khaled.monitoring.svc.cluster.local:10901

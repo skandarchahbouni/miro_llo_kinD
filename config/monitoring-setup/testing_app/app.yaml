@@ -1,41 +1,23 @@
-
-#########################################################
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: my-service-deployment
+  labels:
+    app.kubernetes.io/name: prometheus-example-app
+  name: prometheus-example-app
   namespace: testing
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: my-service
-  strategy:
-    rollingUpdate:
-      maxSurge: 1
-      maxUnavailable: 1
-  minReadySeconds: 5
+      app.kubernetes.io/name: prometheus-example-app
   template:
     metadata:
-      namespace: production
       labels:
-        app: my-service
+        app.kubernetes.io/name: prometheus-example-app
     spec:
-      nodeSelector:
-        kubernetes.io/os: linux
       containers:
-        - name: my-service-pod
-          image: myacr.azurecr.io/my_service:latest
-          envFrom:
-            - secretRef:
-                name: prod-secrets
+        - name: prometheus-example-app
+          image: quay.io/brancz/prometheus-example-app:v0.3.0
           ports:
-            - containerPort: 4050
-          resources:
-            requests:
-              cpu: 250m
-              memory: 250Mi
-            limits:
-              cpu: 500m
-              memory: 500Mi
----
+            - name: web
+              containerPort: 8080

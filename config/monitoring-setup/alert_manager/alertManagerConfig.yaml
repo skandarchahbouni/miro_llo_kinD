@@ -1,0 +1,18 @@
+apiVersion: monitoring.coreos.com/v1alpha1
+kind: AlertmanagerConfig
+metadata:
+  name: alerttrigger
+  namespace: monitoring
+  labels:
+    alertmanagerConfig: thanos
+spec:
+  route:
+    groupBy: ["alertname", "cluster", "service"]
+    groupWait: 3s
+    groupInterval: 30s
+    repeatInterval: 40s
+    receiver: "webhook"
+  receivers:
+    - name: "webhook"
+      webhookConfigs:
+        - url: "high-level-orchestrator.orchestration.onesource.pt:6000/v1/alert"

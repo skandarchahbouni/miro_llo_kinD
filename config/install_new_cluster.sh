@@ -1,7 +1,7 @@
 
 
 
-export CLUSTER_NAME="workload-2"
+export CLUSTER_NAME="workload-1"
 export INGRESS_URL=$CLUSTER_NAME."monitoring.onesource.pt"
 export THANOS_QUERY_CONF="monitoring-setup/thanos/querier.yaml"
 export MANAGEMENT_CLUSTER="management"

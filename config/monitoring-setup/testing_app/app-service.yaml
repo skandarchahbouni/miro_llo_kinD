@@ -1,16 +1,4 @@
 apiVersion: v1
-kind: Service
+kind: Namespace
 metadata:
-  name: nginx-service
-  namespace: monitoring
-  labels:
-    app: nginx
-spec:
-  ports:
-    - port: 80
-      protocol: TCP
-      targetPort: 80
-      name: web
-  selector: 
-    app: nginx
----
+  name: testing

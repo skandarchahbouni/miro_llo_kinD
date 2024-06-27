@@ -40,10 +40,12 @@ spec:
             # - --grpc-client-tls-key=/certs/tls.key
             # - --grpc-client-tls-ca=/certs/ca.crt
             # - --endpoint=dnssrv+_grpc._tcp.khaled.monitoring.onesource.pt
-            # - --store.sd-files=thanos/sdfile.yaml
-            # - --store.sd-interval=10s
-            - --endpoint=khaled.monitoring.svc.cluster.local:10901
+            - --store.sd-files=thanos/sdfile.yaml
+            - --store.sd-interval=3s
+            # - --endpoint=khaled.monitoring.svc.cluster.local:10901
             # - --endpoint=172.18.0.4:10901
+
+            # - --endpoint= khaled.monitoring.svc.cluster
           ports:
             - name: http
               containerPort: 10902
